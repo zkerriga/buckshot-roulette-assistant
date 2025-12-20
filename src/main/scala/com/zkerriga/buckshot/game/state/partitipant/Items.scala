@@ -10,7 +10,7 @@ object Items:
     items.foldLeft(Map.empty[Item, Quantity]): (owned, item) =>
       owned.updatedWith(item):
         case Some(existing) => Some(existing.increase)
-        case None => Some(Quantity.One)
+        case None => Some(Quantity[1])
 
   extension (owned: Items)
     def contain(item: Item): Boolean = owned.contains(item)

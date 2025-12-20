@@ -15,21 +15,21 @@ class ShotSpec extends AnyWordSpec, Matchers {
   "Shot" should {
     "return GameOver if player is killed by dealer's shot" in {
       val state = GameState(
-        maxHealth = HealthLimit(Quantity.Four),
+        maxHealth = HealthLimit[4],
         player = Participant(
-          health = Health(Quantity.One),
+          health = Health[1],
           items = Items(),
           hands = Hands.Free,
           revealed = Revealed(),
         ),
         dealer = Participant(
-          health = Health(Quantity.Two),
+          health = Health[2],
           items = Items(),
           hands = Hands.Free,
           revealed = Revealed(),
         ),
         shotgun = Shotgun(
-          shells = ShellDistribution(live = Nat.One, blank = Nat.Zero),
+          shells = ShellDistribution(live = Nat[1], blank = Nat[0]),
           effects = Effects.Default,
         ),
         turnOf = Dealer,

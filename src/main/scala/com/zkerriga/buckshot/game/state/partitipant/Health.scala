@@ -12,3 +12,5 @@ object Health:
       by match
         case Damage.Single => health.decrease
         case Damage.Double => health.decrease.flatMap(_.decrease)
+
+  inline def apply[N <: Int: ValueOf]: Health = Quantity[N]

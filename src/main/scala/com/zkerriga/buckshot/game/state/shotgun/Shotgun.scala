@@ -35,7 +35,7 @@ object Shotgun:
       shells
         .toRight(ShotgunStateMismatch)
         .map: shells =>
-          Option.unless(shells.total == Nat.Zero):
+          Option.unless(shells.total == Nat[0]):
             Shotgun(
               shells = shells,
               effects = Effects.Default,

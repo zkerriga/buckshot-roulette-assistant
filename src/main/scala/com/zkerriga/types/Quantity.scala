@@ -5,14 +5,12 @@ package com.zkerriga.types
 opaque type Quantity = Nat
 
 object Quantity:
-  val One: Quantity = Nat.One
-  val Two: Quantity = Nat.Two
-  val Three: Quantity = Nat.Three
-  val Four: Quantity = Nat.Four
-
-  import Nat.increase as inc
-  import Nat.decrease as dec
+  import Nat.{decrease as dec, increase as inc}
 
   extension (quantity: Quantity)
     def increase: Quantity = quantity.inc
-    def decrease: Option[Quantity] = Option.unless(quantity == One)(quantity.dec).flatten
+    def decrease: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity.dec).flatten
+
+  inline def apply[N <: Int](using ev: ValueOf[N]): Quantity =
+    inline if ev.value > 0 then Nat[N]
+    else scala.compiletime.error("Quantity must be a positive natural number")
