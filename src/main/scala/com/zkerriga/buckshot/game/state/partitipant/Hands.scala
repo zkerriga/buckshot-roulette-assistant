@@ -4,6 +4,8 @@ case class Hands(cuffed: Option[Hands.Cuffed]):
   def free: Boolean = cuffed.isEmpty
 
 object Hands:
+  val Free: Hands = Hands(None)
+
   enum Cuffed:
     case ForTwoShots, ForOneShot
 

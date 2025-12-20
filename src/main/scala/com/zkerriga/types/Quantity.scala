@@ -6,6 +6,9 @@ opaque type Quantity = Nat
 
 object Quantity:
   val One: Quantity = Nat.One
+  val Two: Quantity = Nat.Two
+  val Three: Quantity = Nat.Three
+  val Four: Quantity = Nat.Four
 
   import Nat.increase as inc
   import Nat.decrease as dec

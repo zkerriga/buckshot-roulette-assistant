@@ -5,6 +5,8 @@ import com.zkerriga.types.Quantity
 opaque type Health = Quantity
 
 object Health:
+  inline def apply(value: Quantity): Health = value
+
   extension (health: Health)
     def damaged(by: Damage): Option[Health] =
       by match
