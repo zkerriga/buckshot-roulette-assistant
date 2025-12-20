@@ -1,4 +1,4 @@
-package com.zkerriga.buckshot.board
+package com.zkerriga.buckshot.game.state
 
 package object items {
   type Adrenaline = Adrenaline.type

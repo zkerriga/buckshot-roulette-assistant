@@ -1,6 +1,6 @@
-package com.zkerriga.buckshot.board.partitipant
+package com.zkerriga.buckshot.game.state.partitipant
 
-import com.zkerriga.buckshot.board.items.{Item, RegularItem}
+import com.zkerriga.buckshot.game.state.items.{Item, RegularItem}
 import com.zkerriga.types.Quantity
 
 opaque type Items = Map[Item, Quantity]

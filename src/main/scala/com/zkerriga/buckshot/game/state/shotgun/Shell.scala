@@ -1,4 +1,4 @@
-package com.zkerriga.buckshot.board.shotgun
+package com.zkerriga.buckshot.game.state.shotgun
 
 enum Shell:
   case Live, Blank

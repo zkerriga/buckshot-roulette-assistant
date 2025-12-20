@@ -1,4 +1,4 @@
-package com.zkerriga.buckshot.board.partitipant
+package com.zkerriga.buckshot.game.state.partitipant
 
 case class Hands(cuffed: Option[Hands.Cuffed])
 
