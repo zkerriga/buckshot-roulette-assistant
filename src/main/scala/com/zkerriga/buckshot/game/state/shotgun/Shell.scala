@@ -5,6 +5,6 @@ enum Shell:
 
 object Shell:
   extension (shell: Shell)
-    def invert: Shell = shell match
+    def inverted: Shell = shell match
       case Shell.Live => Shell.Blank
       case Shell.Blank => Shell.Live
