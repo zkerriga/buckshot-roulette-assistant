@@ -1,6 +1,5 @@
 package com.zkerriga.buckshot.game.events
 
-import cats.syntax.all.*
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.*
 import com.zkerriga.buckshot.game.state.GameState
@@ -19,10 +18,10 @@ object Shot:
     for
       _ <- (state.turnOf == shot.actor) trueOr WrongTurn
       postShotgun <- processDamage(state, shot) match
-        case result: GameOver => result.asRight
+        case result: GameOver => result.ok
         case damaged: PostDamage => processShotgun(state, shot, damaged)
     yield postShotgun match
-      case result: (GameOver | Reset) => result
+      case outcome: (GameOver | Reset) => outcome
       case updated: PostShotgun => buildNextState(state, updated, shot)
 
   private def processDamage(state: GameState, shot: Shot): GameOver | PostDamage =
@@ -48,17 +47,11 @@ object Shot:
       .map:
         case Some(shotgun) => PostShotgun(damaged, shotgun)
         case None =>
-          Reset(
+          Reset.of(
             maxHealth = state.maxHealth,
-            player = snapshot(damaged.player),
-            dealer = snapshot(damaged.dealer),
+            player = damaged.player,
+            dealer = damaged.dealer,
           )
-
-  private def snapshot(participant: Participant): Reset.Participant =
-    Reset.Participant(
-      health = participant.health,
-      items = participant.items,
-    )
 
   private def buildNextState(state: GameState, updated: PostShotgun, shot: Shot): GameState =
     val player = updated.damaged.player.postShot

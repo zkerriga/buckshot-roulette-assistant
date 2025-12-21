@@ -14,7 +14,11 @@ object Items:
 
   extension (owned: Items)
     def contain(item: Item): Boolean = owned.contains(item)
-    def removed(item: Item): Items = owned.updatedWith(item)(_.flatMap(_.decrease))
+    def removed(item: Item): Option[Items] =
+      for
+        quantity <- owned.get(item)
+        newQuantity <- quantity.decrease
+      yield owned.updated(item, newQuantity)
 
     def getRegular: Set[RegularItem] =
       owned.keySet.collect:
