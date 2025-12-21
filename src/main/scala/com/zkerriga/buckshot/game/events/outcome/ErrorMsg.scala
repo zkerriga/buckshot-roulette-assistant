@@ -4,7 +4,7 @@ enum ErrorMsg:
   case WrongTurn
   case ShotgunStateMismatch
   case MissingItems
-  // todo: more
+  case SawAlreadyUsed
 
 object ErrorMsg:
   type V[+A] = Either[ErrorMsg, A]

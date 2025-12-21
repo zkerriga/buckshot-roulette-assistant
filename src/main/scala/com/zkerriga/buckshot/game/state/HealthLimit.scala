@@ -1,8 +1,12 @@
 package com.zkerriga.buckshot.game.state
 
-import com.zkerriga.types.Quantity
+import com.zkerriga.buckshot.game.state.partitipant.Health
 
-opaque type HealthLimit = Quantity
+import scala.math.Ordering.Implicits.infixOrderingOps
+
+opaque type HealthLimit = Health
 
 object HealthLimit:
-  inline def apply[N <: Int: ValueOf]: HealthLimit = Quantity[N]
+  inline def apply[N <: Int: ValueOf]: HealthLimit = Health[N]
+
+  extension (limit: HealthLimit) def cap(health: Health): Health = limit min health

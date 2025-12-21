@@ -1,5 +1,6 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
+import com.zkerriga.buckshot.game.state.HealthLimit
 import com.zkerriga.buckshot.game.state.items.Item
 import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
 
@@ -26,6 +27,9 @@ object Participant:
         .damaged(by)
         .map: updated =>
           participant.copy(health = updated)
+
+    def healed(by: Heal, maxHealth: HealthLimit): Participant =
+      participant.copy(health = participant.health.healed(by, maxHealth))
 
     def cuffed: Participant =
       participant.copy(hands = Hands.Cuffed)

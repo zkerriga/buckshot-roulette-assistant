@@ -5,11 +5,13 @@ package com.zkerriga.types
 opaque type Quantity = Nat
 
 object Quantity:
-  import Nat.{decrease as dec, increase as inc}
+  import Nat.{decreased as dec, increased as inc}
 
   extension (quantity: Quantity)
-    def increase: Quantity = quantity.inc
-    def decrease: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity.dec).flatten
+    def increased: Quantity = quantity.inc
+    def decreased: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity.dec).flatten
+
+  given Ordering[Quantity] = summon[Ordering[Nat]]
 
   inline def apply[N <: Int](using ev: ValueOf[N]): Quantity =
     inline if ev.value > 0 then Nat[N]

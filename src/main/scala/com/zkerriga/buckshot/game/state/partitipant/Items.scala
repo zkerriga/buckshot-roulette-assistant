@@ -9,7 +9,7 @@ object Items:
   def apply(items: Item*): Items =
     items.foldLeft(Map.empty[Item, Quantity]): (owned, item) =>
       owned.updatedWith(item):
-        case Some(existing) => Some(existing.increase)
+        case Some(existing) => Some(existing.increased)
         case None => Some(Quantity[1])
 
   extension (owned: Items)
@@ -17,7 +17,7 @@ object Items:
     def removed(item: Item): Option[Items] =
       for
         quantity <- owned.get(item)
-        newQuantity <- quantity.decrease
+        newQuantity <- quantity.decreased
       yield owned.updated(item, newQuantity)
 
     def getRegular: Set[RegularItem] =

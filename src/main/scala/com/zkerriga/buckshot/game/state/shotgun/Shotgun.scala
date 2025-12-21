@@ -30,8 +30,8 @@ object Shotgun:
     def shellOut(shell: Shell): V[Option[Shotgun]] =
       val actual = if shotgun.inverted then shell.inverted else shell
       val shells = actual match
-        case Live => shotgun.live.decrease.map(updated => shotgun.shells.copy(live = updated))
-        case Blank => shotgun.blank.decrease.map(updated => shotgun.shells.copy(blank = updated))
+        case Live => shotgun.live.decreased.map(updated => shotgun.shells.copy(live = updated))
+        case Blank => shotgun.blank.decreased.map(updated => shotgun.shells.copy(blank = updated))
       shells
         .toRight(ShotgunStateMismatch)
         .map: shells =>
@@ -40,3 +40,12 @@ object Shotgun:
               shells = shells,
               effects = Effects.Default,
             )
+
+    def sawApplied: V[Shotgun] =
+      shotgun.damage.increased
+        .toRight(SawAlreadyUsed)
+        .map: updated =>
+          shotgun.copy(effects = shotgun.effects.copy(damage = updated))
+
+    def inverterApplied: Shotgun =
+      shotgun.copy(effects = shotgun.effects.copy(inverted = !shotgun.effects.inverted))

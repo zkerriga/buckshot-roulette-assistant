@@ -7,7 +7,7 @@ import com.zkerriga.buckshot.game.events.outcome.Outcome.*
 import com.zkerriga.buckshot.game.state.GameState
 import com.zkerriga.buckshot.game.state.items.*
 import com.zkerriga.buckshot.game.state.partitipant.Side.*
-import com.zkerriga.buckshot.game.state.partitipant.{Participant, Side}
+import com.zkerriga.buckshot.game.state.partitipant.{Damage, Heal, Participant, Side}
 import com.zkerriga.buckshot.game.state.shotgun.SeqNr.Shell1
 import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell, Shotgun}
 
@@ -25,6 +25,7 @@ object Used:
     case Meds(good: Boolean)
 
   private case class Participants(user: Participant, opponent: Participant)
+  private case class Updated(participants: Participants, shotgun: Shotgun)
 
   import ItemUse.*
 
@@ -33,8 +34,10 @@ object Used:
       _ <- (state.turnOf == used.actor) trueOr WrongTurn
       (opposition, parties) = defineRelations(used)
       withoutItems <- removeItems(state, used)(using opposition).toRight(MissingItems)
-      outcome <- processEffects(state, withoutItems, used)(using parties)
-    yield outcome
+      result <- processEffects(state, withoutItems, used)(using parties)
+    yield result match
+      case outcome: (GameOver | Reset) => outcome
+      case updated: Updated => buildNextState(state, updated)(using parties)
 
   private def defineRelations(used: Used): (Opposition[GameState], Parties[Participants]) =
     used.actor match
@@ -74,19 +77,19 @@ object Used:
     state: GameState,
     itemless: Participants,
     used: Used,
-  )(using Parties[Participants]): V[GameOver | Reset | GameState] =
+  )(using Parties[Participants]): V[GameOver | Reset | Updated] =
     used.item match
       case Handcuffs =>
-        buildNextState(state, itemless.copy(opponent = itemless.opponent.cuffed), state.shotgun).ok
+        Updated(itemless.copy(opponent = itemless.opponent.cuffed), state.shotgun).ok
 
       case MagnifyingGlass(revealed) =>
-        buildNextState(state, itemless.copy(user = itemless.user.knowing(revealed, Shell1)), state.shotgun).ok
+        Updated(itemless.copy(user = itemless.user.knowing(revealed, Shell1)), state.shotgun).ok
 
       case Beer(out) =>
         state.shotgun
           .shellOut(out)
           .map:
-            case Some(shotgun) => buildNextState(state, itemless, shotgun)
+            case Some(shotgun) => Updated(itemless, shotgun)
             case None =>
               Reset.of(
                 maxHealth = state.maxHealth,
@@ -94,21 +97,46 @@ object Used:
                 dealer = itemless.dealer,
               )
 
-      case Cigarettes => ???
-      case Saw => ???
-      case Inverter => ???
-      case BurnerPhone(revealed, at) => ???
-      case Meds(good) => ???
+      case Cigarettes =>
+        Updated(
+          itemless.copy(user = itemless.user.healed(Heal.Single, state.maxHealth)),
+          state.shotgun,
+        ).ok
 
-  private def buildNextState(
-    state: GameState,
-    participants: Participants,
-    shotgun: Shotgun,
-  )(using
-    Parties[Participants],
-  ): GameState =
+      case Saw =>
+        state.shotgun.sawApplied.map: shotgun =>
+          Updated(itemless, shotgun)
+
+      case Inverter =>
+        Updated(itemless, state.shotgun.inverterApplied).ok
+
+      case BurnerPhone(revealed, at) => ???
+
+      case Meds(good) =>
+        (
+          if good then
+            Updated(
+              itemless.copy(user = itemless.user.healed(Heal.Double, state.maxHealth)),
+              state.shotgun,
+            )
+          else
+            itemless.user.damaged(Damage.Single) match {
+              case Some(user) =>
+                Updated(itemless.copy(user = user), state.shotgun)
+              case None =>
+                used.actor match
+                  case Player => DealerWins
+                  case Dealer =>
+                    PlayerWins(
+                      player = itemless.player.items,
+                      dealer = itemless.dealer.items,
+                    )
+            }
+        ).ok
+
+  private def buildNextState(state: GameState, updated: Updated)(using Parties[Participants]): GameState =
     state.copy(
-      player = participants.player,
-      dealer = participants.dealer,
-      shotgun = shotgun,
+      player = updated.participants.player,
+      dealer = updated.participants.dealer,
+      shotgun = updated.shotgun,
     )
