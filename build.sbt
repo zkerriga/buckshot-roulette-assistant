@@ -6,8 +6,11 @@ lazy val root = project
     name := "buckshot-roulette-assistant",
     version := "0.1.0-SNAPSHOT",
     scalaVersion := scala3Version,
+    assembly / mainClass := Some("com.zkerriga.buckshot.Main"),
+    assembly / assemblyJarName := s"${name.value}.jar",
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % "2.13.0",
+      "com.googlecode.lanterna" % "lanterna" % "3.1.3",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
     ),
   )
