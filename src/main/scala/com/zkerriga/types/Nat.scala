@@ -5,9 +5,13 @@ package com.zkerriga.types
 opaque type Nat = Int
 
 object Nat:
-  val Zero: Nat = 0
-  val One: Nat = 1
-
   extension (number: Nat)
-    def increase: Nat = number + 1
-    def decrease: Option[Nat] = Option.unless(number == Zero)(number - 1)
+    def increased: Nat = number + 1
+    def decreased: Option[Nat] = Option.unless(number == 0)(number - 1)
+    def +(other: Nat): Nat = number + other
+
+  given Ordering[Nat] = Ordering.Int
+
+  inline def apply[N <: Int](using ev: ValueOf[N]): Nat =
+    inline if ev.value >= 0 then ev.value
+    else scala.compiletime.error("Nat must be a natural number")
