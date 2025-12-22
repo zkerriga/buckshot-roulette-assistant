@@ -1,5 +1,6 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
+import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 import com.zkerriga.buckshot.game.state.items.{Item, RegularItem}
 import com.zkerriga.types.Quantity
 
@@ -14,11 +15,11 @@ object Items:
 
   extension (owned: Items)
     def contain(item: Item): Boolean = owned.contains(item)
-    def removed(item: Item): Option[Items] =
-      for
+    def removed(item: Item): V[Items] =
+      (for
         quantity <- owned.get(item)
         newQuantity <- quantity.decreased
-      yield owned.updated(item, newQuantity)
+      yield owned.updated(item, newQuantity)).toRight(MissingItems)
 
     def getRegular: Set[RegularItem] =
       owned.keySet.collect:

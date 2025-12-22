@@ -54,8 +54,8 @@ object Shot:
           )
 
   private def buildNextState(state: GameState, updated: PostShotgun, shot: Shot): GameState =
-    val player = updated.damaged.player.postShot
-    val dealer = updated.damaged.dealer.postShot
+    val player = updated.damaged.player.afterShot
+    val dealer = updated.damaged.dealer.afterShot
     val nextTurnOf = state.turnOf match
       case Player => if keepsTurn(shot, opponent = dealer) then Player else Dealer
       case Dealer => if keepsTurn(shot, opponent = player) then Dealer else Player

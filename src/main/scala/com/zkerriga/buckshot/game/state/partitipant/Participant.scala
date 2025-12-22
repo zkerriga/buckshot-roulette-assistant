@@ -1,5 +1,6 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
+import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 import com.zkerriga.buckshot.game.state.HealthLimit
 import com.zkerriga.buckshot.game.state.items.Item
 import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
@@ -13,7 +14,7 @@ case class Participant(
 
 object Participant:
   extension (participant: Participant)
-    def without(item: Item): Option[Participant] =
+    def without(item: Item): V[Participant] =
       participant.items
         .removed(item)
         .map: updated =>
@@ -31,11 +32,17 @@ object Participant:
     def healed(by: Heal, maxHealth: HealthLimit): Participant =
       participant.copy(health = participant.health.healed(by, maxHealth))
 
-    def cuffed: Participant =
-      participant.copy(hands = Hands.Cuffed)
+    def cuffed: V[Participant] =
+      participant.hands.cuffed.map: updated =>
+        participant.copy(hands = updated)
 
-    def postShot: Participant =
+    def afterShot: Participant =
       participant.copy(
-        hands = participant.hands.postShot,
-        revealed = participant.revealed.postShot,
+        hands = participant.hands.afterShot,
+        revealed = participant.revealed.afterShellOut,
+      )
+
+    def afterShellOut: Participant =
+      participant.copy(
+        revealed = participant.revealed.afterShellOut,
       )

@@ -33,7 +33,7 @@ object Used:
     for
       _ <- (state.turnOf == used.actor) trueOr WrongTurn
       (opposition, parties) = defineRelations(used)
-      withoutItems <- removeItems(state, used)(using opposition).toRight(MissingItems)
+      withoutItems <- removeItems(state, used)(using opposition)
       result <- processEffects(state, withoutItems, used)(using parties)
     yield result match
       case outcome: (GameOver | Reset) => outcome
@@ -52,7 +52,7 @@ object Used:
           Parties.of(playerIs = _.opponent, dealerIs = _.user),
         )
 
-  private def removeItems(state: GameState, used: Used)(using Opposition[GameState]): Option[Participants] =
+  private def removeItems(state: GameState, used: Used)(using Opposition[GameState]): V[Participants] =
     val item = itemOf(used.item)
     if used.stolen then
       for
@@ -80,7 +80,8 @@ object Used:
   )(using Parties[Participants]): V[GameOver | Reset | Updated] =
     used.item match
       case Handcuffs =>
-        Updated(itemless.copy(opponent = itemless.opponent.cuffed), state.shotgun).ok
+        for opponent <- itemless.opponent.cuffed
+        yield Updated(itemless.copy(opponent = opponent), state.shotgun)
 
       case MagnifyingGlass(revealed) =>
         Updated(itemless.copy(user = itemless.user.knowing(revealed, Shell1)), state.shotgun).ok
@@ -89,7 +90,11 @@ object Used:
         state.shotgun
           .shellOut(out)
           .map:
-            case Some(shotgun) => Updated(itemless, shotgun)
+            case Some(shotgun) =>
+              Updated(
+                Participants(user = itemless.user.afterShellOut, opponent = itemless.opponent.afterShellOut),
+                shotgun,
+              )
             case None =>
               Reset.of(
                 maxHealth = state.maxHealth,
@@ -110,7 +115,11 @@ object Used:
       case Inverter =>
         Updated(itemless, state.shotgun.inverterApplied).ok
 
-      case BurnerPhone(revealed, at) => ???
+      case BurnerPhone(revealed, at) =>
+        Updated(
+          itemless.copy(user = itemless.user.knowing(revealed, at)),
+          state.shotgun,
+        ).ok
 
       case Meds(good) =>
         (
@@ -120,9 +129,8 @@ object Used:
               state.shotgun,
             )
           else
-            itemless.user.damaged(Damage.Single) match {
-              case Some(user) =>
-                Updated(itemless.copy(user = user), state.shotgun)
+            itemless.user.damaged(Damage.Single) match
+              case Some(user) => Updated(itemless.copy(user = user), state.shotgun)
               case None =>
                 used.actor match
                   case Player => DealerWins
@@ -131,7 +139,6 @@ object Used:
                       player = itemless.player.items,
                       dealer = itemless.dealer.items,
                     )
-            }
         ).ok
 
   private def buildNextState(state: GameState, updated: Updated)(using Parties[Participants]): GameState =

@@ -5,6 +5,7 @@ enum ErrorMsg:
   case ShotgunStateMismatch
   case MissingItems
   case SawAlreadyUsed
+  case HandsAlreadyCuffed
 
 object ErrorMsg:
   type V[+A] = Either[ErrorMsg, A]

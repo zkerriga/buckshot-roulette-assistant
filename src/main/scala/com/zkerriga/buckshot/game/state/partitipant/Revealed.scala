@@ -12,7 +12,7 @@ object Revealed:
     def get(seqNr: SeqNr): Option[Shell] = revealed.get(seqNr)
     def revealed(shell: Shell, at: SeqNr): Revealed = revealed.updated(at, shell)
 
-    def postShot: Revealed =
+    def afterShellOut: Revealed =
       revealed.flatMap: (seqNr, shell) =>
         val moved = seqNr match
           case Shell1 => None
