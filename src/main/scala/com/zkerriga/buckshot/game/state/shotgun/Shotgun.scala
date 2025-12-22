@@ -27,6 +27,9 @@ object Shotgun:
     )
 
   extension (shotgun: Shotgun)
+    /** Covers both shot and beer scenarios, but I'm not actually sure what happens with non-default [[Effects]] after
+      * using beer. It would be logical to keep them, todo: requires checking
+      */
     def shellOut(shell: Shell): V[Option[Shotgun]] =
       val actual = if shotgun.inverted then shell.inverted else shell
       val shells = actual match

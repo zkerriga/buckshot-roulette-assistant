@@ -4,7 +4,7 @@ import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.*
 import com.zkerriga.buckshot.game.state.GameState
 import com.zkerriga.buckshot.game.state.partitipant.Side.*
-import com.zkerriga.buckshot.game.state.partitipant.{Participant, Side}
+import com.zkerriga.buckshot.game.state.partitipant.{Hands, Participant, Side}
 import com.zkerriga.buckshot.game.state.shotgun.Shell.*
 import com.zkerriga.buckshot.game.state.shotgun.{Shell, Shotgun}
 

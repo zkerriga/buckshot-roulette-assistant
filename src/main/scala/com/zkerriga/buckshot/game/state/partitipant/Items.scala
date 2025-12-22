@@ -16,10 +16,10 @@ object Items:
   extension (owned: Items)
     def contain(item: Item): Boolean = owned.contains(item)
     def removed(item: Item): V[Items] =
-      (for
-        quantity <- owned.get(item)
-        newQuantity <- quantity.decreased
-      yield owned.updated(item, newQuantity)).toRight(MissingItems)
+      for quantity <- owned.get(item).toRight(MissingItem(item))
+      yield quantity.decreased match
+        case Some(newQuantity) => owned.updated(item, newQuantity)
+        case None => owned - item
 
     def getRegular: Set[RegularItem] =
       owned.keySet.collect:

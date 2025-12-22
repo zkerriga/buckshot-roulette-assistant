@@ -2,24 +2,17 @@ package com.zkerriga.buckshot.game.state.partitipant
 
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 
-case class Hands(state: Option[Hands.CuffedFor]):
-  def free: Boolean = state.isEmpty
+enum Hands:
+  case Free, CuffedForTwoShots, CuffedForOneShot
 
 object Hands:
-  val Free: Hands = Hands(None)
-
-  enum CuffedFor:
-    case TwoShots, OneShot
-
   extension (hands: Hands)
-    def cuffed: V[Hands] =
-      hands.state
-        .map(_ => HandsAlreadyCuffed)
-        .toLeft(Hands(Some(CuffedFor.TwoShots)))
+    def free: Boolean = hands == Free
 
-    def afterShot: Hands =
-      Hands(
-        state = hands.state.flatMap:
-          case CuffedFor.OneShot => None
-          case CuffedFor.TwoShots => Some(CuffedFor.OneShot),
-      )
+    def cuffed: V[Hands] =
+      if free then CuffedForTwoShots.ok
+      else HandsAlreadyCuffed.lift
+
+    def afterShot: Hands = hands match
+      case Free | CuffedForOneShot => Free
+      case CuffedForTwoShots => CuffedForOneShot

@@ -13,8 +13,8 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class ShotSpec extends AnyWordSpec, Matchers:
-  "Shot" should {
-    "return GameOver if player is killed by dealer's shot" in {
+  "Shot" should:
+    "return GameOver if player is killed by dealer's shot" in:
       val state = GameState(
         maxHealth = HealthLimit[4],
         player = Participant(
@@ -36,11 +36,9 @@ class ShotSpec extends AnyWordSpec, Matchers:
         turnOf = Dealer,
       )
       val shot = Shot(actor = Dealer, target = Player, shell = Live)
-
       Shot.execute(state, shot) mustBe Right(DealerWins)
-    }
 
-    "return GameOver if dealer is killed by player's shot with saw" in {
+    "return GameOver if dealer is killed by player's shot with saw" in:
       val state = GameState(
         maxHealth = HealthLimit[4],
         player = Participant(
@@ -70,9 +68,6 @@ class ShotSpec extends AnyWordSpec, Matchers:
         turnOf = Player,
       )
       val shot = Shot(actor = Player, target = Dealer, shell = Live)
-
       Shot.execute(state, shot) mustBe Right(
         PlayerWins(player = Items(Cigarettes, MagnifyingGlass), dealer = Items(Beer)),
       )
-    }
-  }

@@ -56,8 +56,8 @@ object Used:
     val item = itemOf(used.item)
     if used.stolen then
       for
-        opponent <- state.opponent.without(item)
         user <- state.actor.without(Adrenaline)
+        opponent <- state.opponent.without(item)
       yield Participants(user = user, opponent = opponent)
     else
       for user <- state.actor.without(item)
