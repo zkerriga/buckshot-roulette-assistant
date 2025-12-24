@@ -12,6 +12,8 @@ object Quantity:
     def decreased: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity.dec).flatten
 
   given Ordering[Quantity] = summon[Ordering[Nat]]
+  given Conversion[Quantity, Nat] = identity
+  given Conversion[Quantity, Int] = summon[Conversion[Nat, Int]].apply
 
   inline def apply[N <: Int](using ev: ValueOf[N]): Quantity =
     inline if ev.value > 0 then Nat[N]

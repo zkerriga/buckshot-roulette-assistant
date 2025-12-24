@@ -11,6 +11,7 @@ object Nat:
     def +(other: Nat): Nat = number + other
 
   given Ordering[Nat] = Ordering.Int
+  given Conversion[Nat, Int] = identity
 
   inline def apply[N <: Int](using ev: ValueOf[N]): Nat =
     inline if ev.value >= 0 then ev.value

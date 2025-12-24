@@ -14,3 +14,4 @@ object all:
 
   export state.partitipant.{Damage, Hands, Health, Items, Participant, Revealed}
   export state.partitipant.Side.{Player, Dealer}
+  export state.partitipant.Side

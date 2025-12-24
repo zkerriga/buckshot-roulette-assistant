@@ -21,6 +21,10 @@ object Items:
         case Some(newQuantity) => owned.updated(item, newQuantity)
         case None => owned - item
 
+    def asList: List[Item] =
+      owned.toList.flatMap: (item, quantity) =>
+        List.fill(quantity)(item)
+
     def getRegular: Set[RegularItem] =
       owned.keySet.collect:
         case item: RegularItem => item
