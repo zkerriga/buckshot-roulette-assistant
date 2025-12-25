@@ -2,6 +2,7 @@ package com.zkerriga.buckshot.tui
 
 import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
+import com.zkerriga.buckshot.game
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.partitipant
@@ -42,18 +43,61 @@ object Render:
   def gameState(game: GameState): Panel =
     val panel = Panel(LinearLayout(Direction.VERTICAL))
 
-    panel.addComponent(participantTitle(Dealer, game.turnOf))
-    panel.addComponent(items(game.dealer.items).withBorder(Borders.singleLine()))
-    panel.addComponent(meta(game.dealer, game.shotgun, game.maxHealth))
+    panel.addComponent(
+      participant(game, Dealer).setLayoutData(
+        LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+      ),
+    )
+    panel.addComponent(
+      Separator(Direction.HORIZONTAL).setLayoutData(
+        LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+      ),
+    )
+    panel.addComponent(EmptySpace())
     panel.addComponent(shotgun(game.shotgun))
-    panel.addComponent(meta(game.player, game.shotgun, game.maxHealth))
-    panel.addComponent(items(game.player.items).withBorder(Borders.singleLine()))
-    panel.addComponent(participantTitle(Player, game.turnOf))
+    panel.addComponent(EmptySpace())
+    panel.addComponent(
+      Separator(Direction.HORIZONTAL).setLayoutData(
+        LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+      ),
+    )
+    panel.addComponent(
+      participant(game, Player).setLayoutData(
+        LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+      ),
+    )
+
+    panel
+
+  def participant(game: GameState, side: Side): Panel =
+    val panel = Panel(LinearLayout(Direction.VERTICAL))
+
+    def topToBottom: Seq[Component] => Seq[Component] = identity
+    def bottomToTop: Seq[Component] => Seq[Component] = _.reverse
+
+    val (participant, order) = side match
+      case Player => (game.player, bottomToTop)
+      case Dealer => (game.dealer, topToBottom)
+
+    order(
+      Seq(
+        participantTitle(side, game.turnOf),
+        Separator(Direction.HORIZONTAL).setLayoutData(
+          LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+        ),
+        EmptySpace(),
+        items(participant.items),
+        EmptySpace(),
+        meta(participant, game.shotgun, game.maxHealth).setLayoutData(
+          LinearLayout.createLayoutData(LinearLayout.Alignment.Fill),
+        ),
+      ),
+    ).foreach(panel.addComponent)
 
     panel
 
   def participantTitle(side: Side, turnOf: Side): Panel =
-    val panel = Panel(LinearLayout(Direction.HORIZONTAL))
+    val panel = Panel(GridLayout(2))
 
     panel.addComponent(Label(side.toString))
     if side == turnOf then panel.addComponent(Label("← turn"))
@@ -61,22 +105,28 @@ object Render:
     panel
 
   def items(items: Items): Panel =
-    val panel = Panel(LinearLayout(Direction.VERTICAL))
+    val panel = Panel(GridLayout(3))
 
-    items.asList
+    val labels = items.asList
       .sortBy(_.toString)
       .map:
-        case Adrenaline => "Adrenaline"
-        case Handcuffs => "Handcuffs"
-        case MagnifyingGlass => "Magnifying Glass"
-        case Beer => "Beer"
-        case Cigarettes => "Cigarettes"
-        case Saw => "Saw"
-        case Inverter => "Inverter"
-        case BurnerPhone => "Burner Phone"
-        case Meds => "Meds"
-      .foreach: item =>
-        panel.addComponent(Label(item))
+        case Adrenaline => Label("Adrenaline") // todo: colors can be set
+        case Handcuffs => Label("Handcuffs")
+        case MagnifyingGlass => Label("Magnifying Glass")
+        case Beer => Label("Beer")
+        case Cigarettes => Label("Cigarettes")
+        case Saw => Label("Saw")
+        case Inverter => Label("Inverter")
+        case BurnerPhone => Label("Burner Phone")
+        case Meds => Label("Meds")
+
+    val (left, right) = (labels ++ List.fill(8 - labels.size)(Label("-"))).splitAt(4)
+    left
+      .zip(right)
+      .foreach: (leftItem, rightItem) =>
+        panel.addComponent(leftItem)
+        panel.addComponent(Separator(Direction.VERTICAL))
+        panel.addComponent(rightItem)
 
     panel
 
@@ -102,12 +152,52 @@ object Render:
 
     panel
 
-  def meta(participant: Participant, shotgun: Shotgun, maxHealth: HealthLimit): Panel =
-    val panel = Panel(LinearLayout(Direction.HORIZONTAL))
+  private def gridLayout(
+    horizontalAlignment: GridLayout.Alignment,
+    verticalAlignment: GridLayout.Alignment,
+    grabExtraHorizontalSpace: Boolean,
+    grabExtraVerticalSpace: Boolean,
+  ): LayoutData = GridLayout.createLayoutData(
+    horizontalAlignment,
+    verticalAlignment,
+    grabExtraHorizontalSpace,
+    grabExtraVerticalSpace,
+  )
 
-    panel.addComponent(revealed(participant.revealed, shotgun))
-    panel.addComponent(hands(participant.hands))
-    panel.addComponent(health(participant.health, maxHealth))
+  def meta(participant: Participant, shotgun: Shotgun, maxHealth: HealthLimit): Panel =
+    val panel = Panel(GridLayout(4))
+
+    panel.addComponent(
+      revealed(participant.revealed, shotgun).setLayoutData(
+        gridLayout(
+          horizontalAlignment = GridLayout.Alignment.BEGINNING,
+          verticalAlignment = GridLayout.Alignment.CENTER,
+          grabExtraHorizontalSpace = false,
+          grabExtraVerticalSpace = false,
+        ),
+      ),
+    )
+    panel.addComponent(EmptySpace().setLayoutData(GridLayout.createHorizontallyFilledLayoutData()))
+    panel.addComponent(
+      hands(participant.hands).setLayoutData(
+        gridLayout(
+          horizontalAlignment = GridLayout.Alignment.END,
+          verticalAlignment = GridLayout.Alignment.CENTER,
+          grabExtraHorizontalSpace = false,
+          grabExtraVerticalSpace = false,
+        ),
+      ),
+    )
+    panel.addComponent(
+      health(participant.health, maxHealth).setLayoutData(
+        gridLayout(
+          horizontalAlignment = GridLayout.Alignment.END,
+          verticalAlignment = GridLayout.Alignment.CENTER,
+          grabExtraHorizontalSpace = false,
+          grabExtraVerticalSpace = false,
+        ),
+      ),
+    )
 
     panel
 
@@ -131,7 +221,7 @@ object Render:
     panel
 
   def health(current: Health, limit: HealthLimit): Label =
-    Label(("⚡" * current).padTo(limit, '-').reverse)
+    Label(("Z" * current).padTo(limit, '-').reverse)
 
   def shotgunShells(shotgun: Shotgun.ShellDistribution): Panel =
     val panel = Panel(GridLayout(2))
