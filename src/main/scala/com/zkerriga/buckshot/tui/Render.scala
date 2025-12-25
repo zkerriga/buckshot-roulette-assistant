@@ -221,7 +221,7 @@ object Render:
     panel
 
   def health(current: Health, limit: HealthLimit): Label =
-    Label(("Z" * current).padTo(limit, '-').reverse)
+    Label(("☇" * current).padTo(limit, '-').reverse)
 
   def shotgunShells(shotgun: Shotgun.ShellDistribution): Panel =
     val panel = Panel(GridLayout(2))
