@@ -9,4 +9,8 @@ opaque type HealthLimit = Health
 object HealthLimit:
   inline def apply[N <: Int: ValueOf]: HealthLimit = Health[N]
 
-  extension (limit: HealthLimit) def cap(health: Health): Health = limit min health
+  extension (limit: HealthLimit)
+    def max: Health = limit
+    def cap(health: Health): Health = limit min health
+
+  given Conversion[HealthLimit, Int] = summon[Conversion[Health, Int]].apply

@@ -21,5 +21,6 @@ object Health:
         case Damage.Double => health.decreased.flatMap(_.decreased)
 
   given Ordering[Health] = summon[Ordering[Quantity]]
+  given Conversion[Health, Int] = summon[Conversion[Quantity, Int]].apply
 
   inline def apply[N <: Int: ValueOf]: Health = Quantity[N]
