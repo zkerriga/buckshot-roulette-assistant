@@ -11,125 +11,37 @@ import com.zkerriga.types.Nat
 object SetupWindow:
   def window(setState: GameState => Unit): Window =
     val window = BasicWindow("New Game")
-    val content = Panel(LinearLayout(Direction.VERTICAL))
     val (compositionPanel, getState) = composition()
-    content.addComponent(compositionPanel)
-    content.addComponent(
-      Button(
-        "Start",
-        () =>
-          getState().state match
-            case Some(state) =>
-              setState(state)
-              window.close()
-            case None => (), // todo: log error
-      ),
-      LinearLayout.createLayoutData(LinearLayout.Alignment.End),
+    val startButton = Button(
+      "Start",
+      () =>
+        getState().state match
+          case Some(state) =>
+            setState(state)
+            window.close()
+          case None => (), // todo: log error
     )
-    content.addComponent(quit(window), LinearLayout.createLayoutData(LinearLayout.Alignment.End))
+    import LinearLayout.*
+    val content = Panel(LinearLayout(Direction.VERTICAL)).withAll(
+      compositionPanel,
+      startButton.setLayoutData(createLayoutData(Alignment.End)),
+      QuitButton.render(window).setLayoutData(createLayoutData(Alignment.End)),
+    )
     window.setComponent(content)
     window
 
-  def quit(window: Window): Button =
-    Button(
-      "Quit",
-      () => window.close(),
-    )
-
-  case class StateForm(state: Option[GameState])
-  def composition(): (Panel, () => StateForm) =
-    val panel = Panel(GridLayout(2))
-
-    def addSeparation() =
-      panel.addComponent(Separator(Direction.HORIZONTAL).setLayoutData(GridLayout.createHorizontallyFilledLayoutData()))
-      panel.addComponent(Separator(Direction.HORIZONTAL).setLayoutData(GridLayout.createHorizontallyFilledLayoutData()))
-
-    panel.addComponent(
-      Label("Max Health"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
+  private case class StateForm(state: Option[GameState])
+  private def composition(): (Panel, () => StateForm) =
     val (dealerHealthPanel, getDealerHealth, updateDealerHealth) = health()
     val (playerHealthPanel, getPlayerHealth, updatePlayerHealth) = health()
     val (maxHealthPanel, getMaxHealth) = maxHealth: limit =>
       updateDealerHealth.by(limit)
       updatePlayerHealth.by(limit)
-    panel.addComponent(maxHealthPanel.withBorder(Borders.singleLine()))
-
-    addSeparation()
-
-    panel.addComponent(
-      Label("Shotgun Live"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
     val (liveShellsPanel, getLiveShells) = shells()
-    panel.addComponent(liveShellsPanel.withBorder(Borders.singleLine()))
-    panel.addComponent(
-      Label("Shotgun Blank"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
     val (blankShellsPanel, getBlankShells) = shells()
-    panel.addComponent(blankShellsPanel.withBorder(Borders.singleLine()))
-
-    addSeparation()
-
-    panel.addComponent(
-      Label("Dealer Health"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
-    panel.addComponent(dealerHealthPanel.withBorder(Borders.singleLine()))
-    panel.addComponent(
-      Label("Dealer Items"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
     val (dealerItemsPanel, getDealerItems) = items()
-    panel.addComponent(dealerItemsPanel)
-
-    addSeparation()
-
-    panel.addComponent(
-      Label("Player Health"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
-    panel.addComponent(playerHealthPanel.withBorder(Borders.singleLine()))
-    panel.addComponent(
-      Label("Player Items"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
     val (playerItemsPanel, getPlayerItems) = items()
-    panel.addComponent(playerItemsPanel)
-
-    addSeparation()
-
-    panel.addComponent(
-      Label("Turn"),
-      GridLayout.createLayoutData(
-        GridLayout.Alignment.BEGINNING,
-        GridLayout.Alignment.CENTER,
-      ),
-    )
     val (turnPanel, getTurn) = turn()
-    panel.addComponent(turnPanel)
 
     def get(): StateForm = StateForm(
       for
@@ -164,10 +76,54 @@ object SetupWindow:
       ),
     )
 
+    import GridLayout.*
+    def separation() =
+      Seq.fill(2)(Separator(Direction.HORIZONTAL).setLayoutData(createHorizontallyFilledLayoutData()))
+
+    val panel = Panel(GridLayout(2)).withSeq:
+      Seq(
+        Seq(
+          Label("Max Health").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          maxHealthPanel.withBorder(Borders.singleLine()),
+        ),
+        separation(),
+        Seq(
+          Label("Shotgun Live").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          liveShellsPanel.withBorder(Borders.singleLine()),
+        ),
+        Seq(
+          Label("Shotgun Blank").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          blankShellsPanel.withBorder(Borders.singleLine()),
+        ),
+        separation(),
+        Seq(
+          Label("Dealer Health").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          dealerHealthPanel.withBorder(Borders.singleLine()),
+        ),
+        Seq(
+          Label("Dealer Items").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          dealerItemsPanel,
+        ),
+        separation(),
+        Seq(
+          Label("Player Health").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          playerHealthPanel.withBorder(Borders.singleLine()),
+        ),
+        Seq(
+          Label("Player Items").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          playerItemsPanel,
+        ),
+        separation(),
+        Seq(
+          Label("Turn").setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+          turnPanel,
+        ),
+      ).flatten
+
     (panel, get)
 
-  case class ShellsForm(shells: Option[Nat])
-  def shells(): (ComboBox[Nat], () => ShellsForm) =
+  private case class ShellsForm(shells: Option[Nat])
+  private def shells(): (ComboBox[Nat], () => ShellsForm) =
     val box = ComboBox[Nat](
       Nat[1],
       Nat[2],
@@ -177,11 +133,11 @@ object SetupWindow:
     def get(): ShellsForm = ShellsForm(Option(box.getSelectedItem))
     (box, get)
 
-  case class HealthForm(health: Option[Health])
-  trait UpdateHealth:
+  private case class HealthForm(health: Option[Health])
+  private trait UpdateHealth:
     def by(limit: HealthLimit): Unit
 
-  def health(): (ComboBox[Health], () => HealthForm, UpdateHealth) =
+  private def health(): (ComboBox[Health], () => HealthForm, UpdateHealth) =
     val available: Seq[Health] = Seq(
       Health[1],
       Health[2],
@@ -202,8 +158,8 @@ object SetupWindow:
     def get(): HealthForm = HealthForm(Option(box.getSelectedItem))
     (box, get, update)
 
-  case class MaxHealthForm(limit: Option[HealthLimit])
-  def maxHealth(update: UpdateHealth): (ComboBox[HealthLimit], () => MaxHealthForm) =
+  private case class MaxHealthForm(limit: Option[HealthLimit])
+  private def maxHealth(update: UpdateHealth): (ComboBox[HealthLimit], () => MaxHealthForm) =
     val available: Seq[HealthLimit] = Seq(
       HealthLimit[2],
       HealthLimit[3],
@@ -217,8 +173,8 @@ object SetupWindow:
       update.by(available(index))
     (box, get)
 
-  case class TurnForm(side: Option[Side])
-  def turn(): (RadioBoxList[Side], () => TurnForm) =
+  private case class TurnForm(side: Option[Side])
+  private def turn(): (RadioBoxList[Side], () => TurnForm) =
     val select = RadioBoxList[Side]()
     select.addItem(Player)
     select.addItem(Dealer)
@@ -226,8 +182,8 @@ object SetupWindow:
     def get(): TurnForm = TurnForm(Option(select.getCheckedItem))
     (select, get)
 
-  case class ItemsForm(items: Items)
-  def items(): (Panel, () => ItemsForm) =
+  private case class ItemsForm(items: Items)
+  private def items(): (Panel, () => ItemsForm) =
     val items: Seq[Item | "-"] = "-" +: (RegularItem.values.toSeq :+ Adrenaline).sortBy(_.toString)
     def box(): ComboBox[Item | "-"] = ComboBox(items*)
 
@@ -240,24 +196,6 @@ object SetupWindow:
     val box7 = box()
     val box8 = box()
 
-    val panel = Panel(LinearLayout(Direction.HORIZONTAL))
-
-    val left = Panel(GridLayout(2))
-    left.addComponent(box1.withBorder(Borders.singleLine()))
-    left.addComponent(box2.withBorder(Borders.singleLine()))
-    left.addComponent(box3.withBorder(Borders.singleLine()))
-    left.addComponent(box4.withBorder(Borders.singleLine()))
-
-    val right = Panel(GridLayout(2))
-    right.addComponent(box5.withBorder(Borders.singleLine()))
-    right.addComponent(box6.withBorder(Borders.singleLine()))
-    right.addComponent(box7.withBorder(Borders.singleLine()))
-    right.addComponent(box8.withBorder(Borders.singleLine()))
-
-    panel.addComponent(left)
-    panel.addComponent(EmptySpace())
-    panel.addComponent(right)
-
     def get(): ItemsForm =
       val selected =
         Seq(box1, box2, box3, box4, box5, box6, box7, box8)
@@ -266,4 +204,18 @@ object SetupWindow:
             case Some(item: Item) => item
       ItemsForm(Items(selected*))
 
-    (panel, get)
+    Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+      Panel(GridLayout(2)).withAll(
+        box1.withBorder(Borders.singleLine()),
+        box2.withBorder(Borders.singleLine()),
+        box3.withBorder(Borders.singleLine()),
+        box4.withBorder(Borders.singleLine()),
+      ),
+      EmptySpace(),
+      Panel(GridLayout(2)).withAll(
+        box5.withBorder(Borders.singleLine()),
+        box6.withBorder(Borders.singleLine()),
+        box7.withBorder(Borders.singleLine()),
+        box8.withBorder(Borders.singleLine()),
+      ),
+    ) -> get
