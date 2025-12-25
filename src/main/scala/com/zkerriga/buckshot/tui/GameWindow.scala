@@ -8,7 +8,7 @@ import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.partitipant
 import com.zkerriga.buckshot.game.state.shotgun.Shell
 
-object Render:
+object GameWindow:
   def window(game: GameState): Window =
     val window = BasicWindow("Buckshot Roulette Assistant")
     val content = Panel(LinearLayout(Direction.VERTICAL))
