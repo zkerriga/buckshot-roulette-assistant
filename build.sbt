@@ -12,6 +12,7 @@ lazy val root = project
       "org.typelevel" %% "cats-core" % "2.13.0",
       "org.typelevel" %% "cats-effect" % "3.6.3",
       "org.typelevel" %% "cats-effect-cps" % "0.5.0",
+      "org.typelevel" %% "spire" % "0.18.0",
       "com.googlecode.lanterna" % "lanterna" % "3.1.3",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
     ),

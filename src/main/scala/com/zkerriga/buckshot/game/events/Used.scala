@@ -10,7 +10,7 @@ import com.zkerriga.buckshot.game.state.partitipant.Side.*
 import com.zkerriga.buckshot.game.state.partitipant.{Damage, Heal, Participant, Side}
 import com.zkerriga.buckshot.game.state.shotgun.{Shell, Shotgun}
 
-case class Used[Actor <: Side](actor: Actor, item: ItemUse, stolen: Boolean)
+case class Used[+Actor <: Side](actor: Actor, item: ItemUse, stolen: Boolean)
 
 object Used:
   enum ItemUse:

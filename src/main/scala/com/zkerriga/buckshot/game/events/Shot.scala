@@ -8,7 +8,7 @@ import com.zkerriga.buckshot.game.state.partitipant.{Hands, Participant, Side}
 import com.zkerriga.buckshot.game.state.shotgun.Shell.*
 import com.zkerriga.buckshot.game.state.shotgun.{Shell, Shotgun}
 
-case class Shot[Actor <: Side](actor: Actor, target: Side, shell: Shell)
+case class Shot[+Actor <: Side](actor: Actor, target: Side, shell: Shell)
 
 object Shot:
   private case class PostDamage(dealer: Participant, player: Participant)

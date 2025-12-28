@@ -1,6 +1,7 @@
 package com.zkerriga.buckshot.game
 
 object all:
+  export state.TableState
   export state.HealthLimit
 
   export state.shotgun.Shotgun
