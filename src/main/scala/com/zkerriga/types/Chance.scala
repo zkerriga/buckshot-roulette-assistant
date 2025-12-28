@@ -11,3 +11,6 @@ object Chance:
     infix def or(other: Chance): Chance = chance + other
     infix def and(other: Chance): Chance = chance * other
     infix def in(other: Chance): Chance = chance / other
+    def show: String = f"${chance * 100}%.2f%%"
+
+  given Ordering[Chance] = summon[Ordering[BigDecimal]]

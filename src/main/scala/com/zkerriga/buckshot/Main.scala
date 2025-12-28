@@ -2,7 +2,7 @@ package com.zkerriga.buckshot
 
 import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
-import com.zkerriga.buckshot.game.state.GameState
+import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.tui.{ColorScheme, GameWindow, SetupWindow}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -20,7 +20,7 @@ object Main:
     textGUI.setTheme(ColorScheme.Default)
 
     val stateRef: AtomicReference[Option[GameState]] = AtomicReference(None)
-    val setupWindow = SetupWindow.window(state => stateRef.set(Some(state)))
+    val setupWindow = SetupWindow.window(state => stateRef.set(Some(GameState.initial(state))))
     textGUI.addWindowAndWait(setupWindow)
 
     stateRef.get() match

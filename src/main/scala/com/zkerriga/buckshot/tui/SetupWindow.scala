@@ -5,11 +5,11 @@ import com.zkerriga.buckshot.game
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.items.{Item, RegularItem}
-import com.zkerriga.buckshot.game.state.partitipant
+import com.zkerriga.buckshot.game.state.{TableState, partitipant}
 import com.zkerriga.types.Nat
 
 object SetupWindow:
-  def window(setState: GameState => Unit): Window =
+  def window(setState: TableState => Unit): Window =
     val window = BasicWindow("New Game")
     val (compositionPanel, getState) = composition()
     val startButton = Button(
@@ -30,7 +30,7 @@ object SetupWindow:
     window.setComponent(content)
     window
 
-  private case class StateForm(state: Option[GameState])
+  private case class StateForm(state: Option[TableState])
   private def composition(): (Panel, () => StateForm) =
     val (dealerHealthPanel, getDealerHealth, updateDealerHealth) = health()
     val (playerHealthPanel, getPlayerHealth, updatePlayerHealth) = health()
@@ -50,29 +50,24 @@ object SetupWindow:
         blank <- getBlankShells().shells
         dealerHealth <- getDealerHealth().health if dealerHealth <= maxHealth
         playerHealth <- getPlayerHealth().health if playerHealth <= maxHealth
-        turnOf <- getTurn().side
-      yield GameState(
+        turn <- getTurn().side
+      yield TableState(
         maxHealth = maxHealth,
-        shotgun = Shotgun(
-          shells = ShellDistribution(
-            live = live,
-            blank = blank,
-          ),
-          effects = Shotgun.Effects.Default,
+        turn = turn,
+        dealer = Participant(
+          health = dealerHealth,
+          items = getDealerItems().items,
+          hands = Hands.Free,
+        ),
+        shotgun = Shotgun.fresh(
+          live = live,
+          blank = blank,
         ),
         player = Participant(
           health = playerHealth,
           items = getPlayerItems().items,
           hands = Hands.Free,
-          revealed = Revealed(),
         ),
-        dealer = Participant(
-          health = dealerHealth,
-          items = getDealerItems().items,
-          hands = Hands.Free,
-          revealed = Revealed(),
-        ),
-        turnOf = turnOf,
       ),
     )
 

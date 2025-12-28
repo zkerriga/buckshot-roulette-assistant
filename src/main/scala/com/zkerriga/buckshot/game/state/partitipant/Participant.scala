@@ -9,7 +9,6 @@ case class Participant(
   health: Health,
   items: Items,
   hands: Hands,
-  revealed: Revealed,
 )
 
 object Participant:
@@ -19,9 +18,6 @@ object Participant:
         .removed(item)
         .map: updated =>
           participant.copy(items = updated)
-
-    def knowing(shell: Shell, at: SeqNr): Participant =
-      participant.copy(revealed = participant.revealed.revealed(shell, at))
 
     def damaged(by: Damage): Option[Participant] =
       participant.health
@@ -37,12 +33,4 @@ object Participant:
         participant.copy(hands = updated)
 
     def afterShot: Participant =
-      participant.copy(
-        hands = participant.hands.afterShot,
-        revealed = participant.revealed.afterShellOut,
-      )
-
-    def afterShellOut: Participant =
-      participant.copy(
-        revealed = participant.revealed.afterShellOut,
-      )
+      participant.copy(hands = participant.hands.afterShot)

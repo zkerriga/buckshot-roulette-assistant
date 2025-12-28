@@ -26,6 +26,15 @@ object Shotgun:
       inverted = false,
     )
 
+  def fresh(live: Nat, blank: Nat): Shotgun =
+    Shotgun(
+      shells = ShellDistribution(
+        live = live,
+        blank = blank,
+      ),
+      effects = Effects.Default,
+    )
+
   extension (shotgun: Shotgun)
     /** Covers both shot and beer scenarios, but I'm not actually sure what happens with non-default [[Effects]] after
       * using beer. It would be logical to keep them, todo: requires checking

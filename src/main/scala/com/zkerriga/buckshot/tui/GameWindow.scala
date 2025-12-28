@@ -1,6 +1,7 @@
 package com.zkerriga.buckshot.tui
 
 import com.googlecode.lanterna.gui2.*
+import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.all.*
 
 object GameWindow:

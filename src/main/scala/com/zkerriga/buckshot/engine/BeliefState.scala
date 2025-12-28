@@ -3,10 +3,11 @@ package com.zkerriga.buckshot.engine
 import cats.Eq
 import cats.syntax.all.*
 import cats.data.NonEmptySeq
-import com.zkerriga.buckshot.engine.BeliefState.{Possible, renormalize}
+import com.zkerriga.buckshot.engine.BeliefState.{Possible, deduplicate, renormalize}
 import com.zkerriga.types.Chance
 
 case class BeliefState[A](states: NonEmptySeq[Possible[A]]):
+  require(states.forall(_.chance != Chance.NoChance)) // todo: testing
   require(states.map(_.chance).reduce(using _ or _) == Chance.Certain) // todo: testing
 
   /** @param howPossible
@@ -22,6 +23,12 @@ case class BeliefState[A](states: NonEmptySeq[Possible[A]]):
         // todo: figure out proper error handling
         throw RuntimeException("conditioning led to an impossible belief state")
 
+  def transform(transformation: A => BeliefState[A])(using Eq[A]): BeliefState[A] =
+    val updated = states.flatMap: possible =>
+      val outcomes = transformation(possible.value)
+      outcomes.states.map(_.adjusted(_ and possible.chance))
+    BeliefState(deduplicate(updated))
+
 object BeliefState:
   case class Possible[A](value: A, chance: Chance):
     require(chance != Chance.NoChance) // todo: testing
@@ -34,6 +41,10 @@ object BeliefState:
 
   def fromUnique[A](value: Possible[A], values: Possible[A]*): BeliefState[A] =
     BeliefState(NonEmptySeq(value, values))
+
+  def deterministic[A](value: A): BeliefState[A] =
+    fromUnique:
+      Chance.Certain -> value
 
   private def deduplicate[A: Eq](states: NonEmptySeq[Possible[A]]): NonEmptySeq[Possible[A]] =
     val (head, rest) = states.tail.foldLeft((head = states.head, rest = Map.empty[A, Chance])): (acc, a) =>

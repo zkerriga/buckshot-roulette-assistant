@@ -7,16 +7,16 @@ object Outcome:
   case object DealerWins
 
   case class PlayerWins(
-    player: Items,
     dealer: Items,
+    player: Items,
   )
 
   type GameOver = DealerWins.type | PlayerWins
 
   case class Reset(
     maxHealth: HealthLimit,
-    player: Reset.ParticipantDetails,
     dealer: Reset.ParticipantDetails,
+    player: Reset.ParticipantDetails,
   )
   object Reset:
     case class ParticipantDetails(
@@ -30,9 +30,9 @@ object Outcome:
           items = participant.items,
         )
 
-    def of(maxHealth: HealthLimit, player: Participant, dealer: Participant): Reset =
+    def of(maxHealth: HealthLimit, dealer: Participant, player: Participant): Reset =
       Reset(
         maxHealth = maxHealth,
-        player = ParticipantDetails.of(player),
         dealer = ParticipantDetails.of(dealer),
+        player = ParticipantDetails.of(player),
       )

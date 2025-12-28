@@ -1,4 +1,4 @@
-package com.zkerriga.buckshot.game.state.partitipant
+package com.zkerriga.buckshot.engine.state
 
 import com.zkerriga.buckshot.game.state.shotgun.SeqNr.*
 import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
@@ -6,6 +6,8 @@ import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
 opaque type Revealed = Map[SeqNr, Shell]
 
 object Revealed:
+  val Nothing: Revealed = Map.empty
+
   def apply(revealed: (SeqNr, Shell)*): Revealed = revealed.toMap
 
   extension (revealed: Revealed)
