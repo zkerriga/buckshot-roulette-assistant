@@ -34,3 +34,6 @@ object Participant:
 
     def afterShot: Participant =
       participant.copy(hands = participant.hands.afterShot)
+
+    infix def has(item: Item): Boolean = participant.items.contain(item)
+    infix def hasNo(item: Item): Boolean = !has(item)
