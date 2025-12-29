@@ -7,9 +7,9 @@ import com.zkerriga.types.Nat
 
 object DealerAi:
   enum Action:
-    case Use(item: RegularItem, steal: Boolean)
-    case Shoot(target: Side)
-    case Guess(live: Use | Shoot, blank: Shoot)
+    case Use[Item <: RegularItem, Steal <: Boolean](item: Item, steal: Steal)
+    case Shoot[Target <: Side](target: Target)
+    case Guess(live: Use[Saw.type, false] | Shoot[Player.type], blank: Shoot[Dealer.type])
 
   def next(state: TableState, knowledge: Revealed): Action =
     import state.*
