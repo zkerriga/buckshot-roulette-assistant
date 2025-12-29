@@ -16,6 +16,8 @@ object Revealed:
   extension (revealed: Revealed)
     def get(seqNr: SeqNr): Option[Shell] = revealed.get(seqNr)
     def count(shell: Shell): Nat = revealed.values.countNat(_ == shell)
+    def except(at: SeqNr): Revealed = revealed - at
+
     def revealed(shell: Shell, at: SeqNr): Revealed = revealed.updated(at, shell)
 
     def afterShellOut: Revealed =

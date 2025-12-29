@@ -40,7 +40,7 @@ object Shotgun:
       * using beer. It would be logical to keep them, todo: requires checking
       */
     def shellOut(shell: Shell): V[Option[Shotgun]] =
-      val actual = if shotgun.inverted then shell.inverted else shell
+      val actual = shell.considering(shotgun.effects)
       val shells = actual match
         case Live => shotgun.live.decreased.map(updated => shotgun.shells.copy(live = updated))
         case Blank => shotgun.blank.decreased.map(updated => shotgun.shells.copy(blank = updated))

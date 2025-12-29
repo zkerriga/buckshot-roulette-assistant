@@ -23,6 +23,7 @@ case class BeliefState[A](states: NonEmptySeq[Possible[A]]):
         // todo: figure out proper error handling
         throw RuntimeException("conditioning led to an impossible belief state")
 
+  // todo: do I have non-deterministic transformations?
   def transform(transformation: A => BeliefState[A])(using Eq[A]): BeliefState[A] =
     val updated = states.flatMap: possible =>
       val outcomes = transformation(possible.value)

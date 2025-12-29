@@ -17,6 +17,7 @@ object Chance:
     infix def in(other: Chance): Chance = chance / other
     def show: String = s"${chance.toBigDecimal(6, RoundingMode.HALF_UP) * 100}%"
 
-  def binary(value: Boolean): Chance = if value then Certain else NoChance
+  def certainWhen(condition: Boolean): Chance = if condition then Certain else NoChance
+  def certainUnless(condition: Boolean): Chance = certainWhen(!condition)
 
   given Ordering[Chance] = summon[Ordering[Rational]]

@@ -65,7 +65,7 @@ object DealerAi:
           else if shotgun.blank == revealed.count(Blank) then Live.some
           else None
         .map: shell =>
-          Known(if shotgun.inverted then shell.inverted else shell)
+          Known(shell.considering(shotgun.effects))
         .getOrElse(Unknown)
 
   private enum SimpleChance:

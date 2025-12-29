@@ -3,7 +3,8 @@ package com.zkerriga.buckshot.engine.events
 import com.zkerriga.buckshot.engine.BeliefState
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.ai.DealerAi.Action
-import com.zkerriga.buckshot.engine.state.{GameState, Knowledge}
+import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
+import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Shot
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.V
@@ -20,19 +21,18 @@ object DealerShot:
         case table: TableState =>
           val dealerKnowledgeBelief = state.knowledge.dealer
             .conditioning: revealed =>
-              if revealed.get(Shell1).exists(_ != shot.shell) then Chance.NoChance
+              if missOnShellOut(revealed, old = state.shotgun, updated = table.shotgun, out = shot.shell) then
+                Chance.NoChance
               else
                 DealerAi.next(state.public, revealed) match
                   case Action.Use(_, _) => Chance.NoChance
-                  case Action.Shoot(target) => Chance.binary(target == shot.target)
+                  case Action.Shoot(target) => Chance.certainWhen(target == shot.target)
                   case Action.Guess(live, Action.Shoot(Dealer)) =>
-                    val ifGuessedBlank = Chance.binary(shot.target == Dealer)
-                    val ifGuessedLive = Chance.binary(live == Action.Shoot(Player) && shot.target == Player)
+                    val ifGuessedBlank = Chance.certainWhen(shot.target == Dealer)
+                    val ifGuessedLive = Chance.certainWhen(live == Action.Shoot(Player) && shot.target == Player)
                     (ifGuessedBlank and Chance.CoinFlip) or (ifGuessedLive and Chance.CoinFlip)
             .transform: revealed =>
               BeliefState.deterministic(revealed.afterShellOut)
-            .conditioning: revealed =>
-              Chance.binary(revealed.count(Live) <= table.shotgun.live && revealed.count(Blank) <= table.shotgun.blank)
 
           GameState(
             public = table,

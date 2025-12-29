@@ -1,8 +1,8 @@
 package com.zkerriga.buckshot.engine.events
 
 import com.zkerriga.buckshot.engine.BeliefState
+import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
 import com.zkerriga.buckshot.engine.state.{GameState, Knowledge}
-import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Shot
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.V
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
@@ -19,11 +19,10 @@ object PlayerShot:
         case table: TableState =>
           val dealerKnowledgeBelief = state.knowledge.dealer
             .conditioning: revealed =>
-              Chance.binary(revealed.get(Shell1).forall(_ == shot.shell))
+              Chance.certainUnless:
+                missOnShellOut(revealed, old = state.shotgun, updated = table.shotgun, out = shot.shell)
             .transform: revealed =>
               BeliefState.deterministic(revealed.afterShellOut)
-            .conditioning: revealed =>
-              Chance.binary(revealed.count(Live) <= table.shotgun.live && revealed.count(Blank) <= table.shotgun.blank)
 
           GameState(
             public = table,
