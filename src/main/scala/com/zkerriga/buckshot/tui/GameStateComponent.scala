@@ -123,7 +123,7 @@ object GameStateComponent:
         )
 
   private def health(current: Health, limit: HealthLimit): Label =
-    Label(("☇" * current).padTo(limit, '-').reverse)
+    Label(("☇" * current.asInt).padTo(limit.asInt, '-').reverse)
 
   private def shotgunShells(shotgun: Shotgun.ShellDistribution): Panel =
     Panel(GridLayout(2)).withAll(

@@ -10,7 +10,7 @@ object HealthLimit:
   inline def apply[N <: Int: ValueOf]: HealthLimit = Health[N]
 
   extension (limit: HealthLimit)
-    def max: Health = limit
+    def maxAllowed: Health = limit
+    def allows(health: Health): Boolean = health <= limit
     def cap(health: Health): Health = limit min health
-
-  given Conversion[HealthLimit, Int] = summon[Conversion[Health, Int]].apply
+    def asInt: Int = Health.asInt(limit)

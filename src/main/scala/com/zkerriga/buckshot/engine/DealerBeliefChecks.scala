@@ -2,6 +2,7 @@ package com.zkerriga.buckshot.engine
 
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.engine.state.Revealed
+import scala.math.Ordering.Implicits.*
 
 object DealerBeliefChecks:
   def missOnShellOut(knowledge: Revealed, old: Shotgun, updated: Shotgun, out: Shell): Boolean =

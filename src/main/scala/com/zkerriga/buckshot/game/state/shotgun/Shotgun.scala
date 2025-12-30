@@ -14,7 +14,7 @@ case class Shotgun(
 
 object Shotgun:
   case class ShellDistribution(live: Nat, blank: Nat):
-    val total: Nat = live + blank
+    val total: Nat = live plus blank
 
   case class Effects(
     damage: Damage,
@@ -42,8 +42,8 @@ object Shotgun:
     def shellOut(shell: Shell): V[Option[Shotgun]] =
       val actual = shell.considering(shotgun.effects)
       val shells = actual match
-        case Live => shotgun.live.decreased.map(updated => shotgun.shells.copy(live = updated))
-        case Blank => shotgun.blank.decreased.map(updated => shotgun.shells.copy(blank = updated))
+        case Live => (shotgun.live minus Nat[1]).map(updated => shotgun.shells.copy(live = updated))
+        case Blank => (shotgun.blank minus Nat[1]).map(updated => shotgun.shells.copy(blank = updated))
       shells
         .toRight(ShotgunStateMismatch)
         .map: shells =>

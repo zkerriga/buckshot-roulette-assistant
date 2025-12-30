@@ -7,7 +7,7 @@ opaque type BeliefState[+A] = Distribution[A]
 
 object BeliefState:
   def deterministic[A](value: A): BeliefState[A] =
-    Distribution.unsafe(Chance.Certain -> value)
+    Distribution.deterministic(value)
 
   /** must be constructed with positive chances that sum up to 100%
     */

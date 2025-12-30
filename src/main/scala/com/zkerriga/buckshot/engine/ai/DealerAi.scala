@@ -4,6 +4,7 @@ import cats.syntax.all.*
 import com.zkerriga.buckshot.engine.state.Revealed
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.types.Nat
+import scala.math.Ordering.Implicits.*
 
 object DealerAi:
   enum Action:
@@ -21,17 +22,27 @@ object DealerAi:
     def canUse(item: RegularItem): Boolean =
       (dealer has item) || ((dealer has Adrenaline) && (player has item))
 
+    def wantsMagnifyingGlass = nextShell == Unknown
+    def wantsHandcuffs = player.hands.free && shotgun.total > Nat[1]
+    def wantsCigarettes = dealer.health < maxHealth.maxAllowed
+    def wantsMeds = dealer.health < maxHealth.maxAllowed && dealer.health > Health[1] && !canUse(Cigarettes)
+    def wantsBeer = nextShell != Known(Live) && shotgun.total > Nat[1]
+    def wantsSaw = shotgun.damage != Damage.Double && nextShell == Known(Live)
+    def wantsBurnerPhone = shotgun.total > Nat[2]
+    def wantsInverter = nextShell == Known(Blank)
+
+    def wants(item: RegularItem, condition: Boolean): Option[RegularItem] =
+      Option.when(canUse(item) && condition)(item)
+
     val wantsToUse =
-      if canUse(MagnifyingGlass) && nextShell == Unknown then MagnifyingGlass.some
-      else if canUse(Handcuffs) && player.hands.free && shotgun.total > Nat[1] then Handcuffs.some
-      else if canUse(Cigarettes) && dealer.health != maxHealth.max then Cigarettes.some
-      else if canUse(Meds) && dealer.health != maxHealth.max && dealer.health > Health[1] && !canUse(Cigarettes) then
-        Meds.some
-      else if canUse(Beer) && nextShell != Known(Live) && shotgun.total > Nat[1] then Beer.some
-      else if canUse(Saw) && shotgun.damage != Damage.Double && nextShell == Known(Live) then Saw.some
-      else if canUse(BurnerPhone) && shotgun.total > Nat[2] then BurnerPhone.some
-      else if canUse(Inverter) && nextShell == Known(Blank) then Inverter.some
-      else None
+      wants(MagnifyingGlass, wantsMagnifyingGlass)
+        .orElse(wants(Handcuffs, wantsHandcuffs))
+        .orElse(wants(Cigarettes, wantsCigarettes))
+        .orElse(wants(Meds, wantsMeds))
+        .orElse(wants(Beer, wantsBeer))
+        .orElse(wants(Saw, wantsSaw))
+        .orElse(wants(BurnerPhone, wantsBurnerPhone))
+        .orElse(wants(Inverter, wantsInverter))
 
     wantsToUse match
       case Some(item) => Action.Use(item, steal = dealer hasNo item)

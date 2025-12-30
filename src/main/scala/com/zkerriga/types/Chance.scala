@@ -20,4 +20,6 @@ object Chance:
   def certainWhen(condition: Boolean): Chance = if condition then Certain else NoChance
   def certainUnless(condition: Boolean): Chance = certainWhen(!condition)
 
+  def wighted(weight: Nat, total: Nat): Chance = Rational(weight, total)
+
   given Ordering[Chance] = summon[Ordering[Rational]]

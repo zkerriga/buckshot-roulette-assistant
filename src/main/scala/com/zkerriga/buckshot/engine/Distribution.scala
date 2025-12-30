@@ -3,7 +3,7 @@ package com.zkerriga.buckshot.engine
 import cats.Eq
 import cats.syntax.all.*
 import cats.data.NonEmptySeq
-import com.zkerriga.types.Chance
+import com.zkerriga.types.{Chance, Nat}
 
 /** Probabilistic distribution of possible [[A]] values
   *
@@ -15,6 +15,17 @@ object Distribution:
   /** [[A]] can be called [[Possible]] when its chance is positive
     */
   type Possible[+A] = (chance: Chance, value: A)
+
+  def deterministic[A](value: A): Distribution[A] =
+    unsafe(Chance.Certain -> value)
+
+  def weighted[A](values: NonEmptySeq[(weight: Nat, value: A)]): Distribution[A] =
+    val total = values.map(_.weight).reduce(using _ plus _)
+    values.map: (weight, value) =>
+      Chance.wighted(weight, total) -> value
+
+  def weighted[A](value: (weight: Nat, value: A), values: (weight: Nat, value: A)*): Distribution[A] =
+    weighted(NonEmptySeq(value, values))
 
   extension [A](values: Distribution[A])
     def asSeq: Seq[Possible[A]] = values.toSeq

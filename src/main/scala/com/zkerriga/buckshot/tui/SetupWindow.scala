@@ -48,8 +48,8 @@ object SetupWindow:
         maxHealth <- getMaxHealth().limit
         live <- getLiveShells().shells
         blank <- getBlankShells().shells
-        dealerHealth <- getDealerHealth().health if dealerHealth <= maxHealth
-        playerHealth <- getPlayerHealth().health if playerHealth <= maxHealth
+        dealerHealth <- getDealerHealth().health if maxHealth.allows(dealerHealth)
+        playerHealth <- getPlayerHealth().health if maxHealth.allows(playerHealth)
         turn <- getTurn().side
       yield TableState(
         maxHealth = maxHealth,
@@ -146,8 +146,8 @@ object SetupWindow:
     val update: UpdateHealth = (limit: HealthLimit) =>
       val current: Option[Health] = Option(box.getSelectedItem)
       box.clearItems()
-      available.filter(_ <= limit).foreach(box.addItem)
-      val updated = current.map(limit.cap).getOrElse(limit.max)
+      available.filter(limit.allows).foreach(box.addItem)
+      val updated = current.map(limit.cap).getOrElse(limit.maxAllowed)
       box.setSelectedItem(updated)
 
     def get(): HealthForm = HealthForm(Option(box.getSelectedItem))
