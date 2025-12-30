@@ -13,12 +13,13 @@ object GameWindow:
     window.setComponent(content)
     window
 
-  def composition(engine: Engine): Panel =
+  private def composition(engine: Engine): Panel =
     engine.getState match
       case Left(error) => Panel().withAll(Label(error))
       case Right(game) =>
+        val gameStateDynamic = DynamicComponent.of(game, GameStateComponent.render)
         Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-          GameStateComponent.render(game),
+          gameStateDynamic.component,
           EmptySpace(),
-          ControlComponent.render(),
+          ControlComponent.render(engine, game, gameStateDynamic),
         )
