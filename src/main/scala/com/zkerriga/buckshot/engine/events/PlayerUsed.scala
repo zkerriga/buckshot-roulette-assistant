@@ -3,7 +3,7 @@ package com.zkerriga.buckshot.engine.events
 import com.zkerriga.buckshot.engine.BeliefState
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.{missOnGlassReveal, missOnPhoneReveal, missOnShellOut}
 import com.zkerriga.buckshot.engine.events.PlayerUsed.ItemUse
-import com.zkerriga.buckshot.engine.state.{GameState, Knowledge}
+import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.V
@@ -31,45 +31,43 @@ object PlayerUsed:
       .map:
         case outcome: (GameOver | Reset) => outcome
         case table: TableState =>
-          import state.knowledge.*
-          val updatedKnowledge =
-            used.item match
-              case ItemUse.MagnifyingGlass(revealed) =>
-                Knowledge(
-                  dealer = dealer.conditioning: knowledge =>
-                    Chance.certainUnless:
-                      missOnGlassReveal(knowledge, table.shotgun, revealed)
-                  ,
-                  player = player.revealed(revealed, Shell1),
-                )
-
-              case ItemUse.BurnerPhone(revealed, at) =>
-                Knowledge(
-                  dealer = dealer.conditioning: knowledge =>
-                    Chance.certainUnless:
-                      missOnPhoneReveal(knowledge, table.shotgun, revealed, at)
-                  ,
-                  player = player.revealed(revealed, at),
-                )
-
-              case ItemUse.Beer(out) =>
-                Knowledge(
-                  dealer = dealer
-                    .conditioning: knowledge =>
-                      Chance.certainUnless:
-                        missOnShellOut(knowledge, old = state.shotgun, updated = table.shotgun, out = out)
-                    .transform: knowledge =>
-                      BeliefState.deterministic(knowledge.afterShellOut),
-                  player = player.afterShellOut,
-                )
-
-              case ItemUse.Handcuffs | ItemUse.Cigarettes | ItemUse.Saw | ItemUse.Inverter | _: ItemUse.Meds =>
-                state.knowledge
-
           GameState(
             public = table,
-            knowledge = updatedKnowledge,
+            knowledge = Knowledge(
+              dealer = updateDealerKnowledge(state.knowledge.dealer, used.item, state, table),
+              player = updatePlayerKnowledge(state.knowledge.player, used.item),
+            ),
           )
+
+  private def updatePlayerKnowledge(knowledge: Revealed, item: ItemUse): Revealed =
+    item match
+      case ItemUse.MagnifyingGlass(revealed) => knowledge.revealed(revealed, Shell1)
+      case ItemUse.BurnerPhone(revealed, at) => knowledge.revealed(revealed, at)
+      case ItemUse.Beer(out) => knowledge.afterShellOut
+      case _ => knowledge
+
+  private def updateDealerKnowledge(
+    belief: BeliefState[Revealed],
+    item: ItemUse,
+    oldState: GameState,
+    table: TableState,
+  ): BeliefState[Revealed] =
+    item match
+      case ItemUse.MagnifyingGlass(revealed) =>
+        belief.conditioning: knowledge =>
+          Chance.certainUnless(missOnGlassReveal(knowledge, table.shotgun, revealed))
+
+      case ItemUse.BurnerPhone(revealed, at) =>
+        belief.conditioning: knowledge =>
+          Chance.certainUnless(missOnPhoneReveal(knowledge, table.shotgun, revealed, at))
+
+      case ItemUse.Beer(out) =>
+        belief
+          .conditioning: knowledge =>
+            Chance.certainUnless(missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out))
+          .update(_.afterShellOut)
+
+      case _ => belief
 
   private object ItemUse:
     val asPublic: ItemUse => Used.ItemUse =

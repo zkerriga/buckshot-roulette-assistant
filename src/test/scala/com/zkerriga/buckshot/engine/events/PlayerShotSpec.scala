@@ -1,7 +1,6 @@
 package com.zkerriga.buckshot.engine.events
 
 import com.zkerriga.buckshot.engine.BeliefState
-import com.zkerriga.buckshot.engine.BeliefState.*
 import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Shot
@@ -33,7 +32,7 @@ class PlayerShotSpec extends AnyWordSpec, Matchers:
           ),
         ),
         knowledge = Knowledge(
-          dealer = BeliefState.fromUnique(
+          dealer = BeliefState.unsafe(
             /** preserved, because dealer had correct assumption about the first shell
               */
             (Chance.CoinFlip and Chance.CoinFlip) -> Revealed(Shell1 -> Live, Shell3 -> Blank),
@@ -70,7 +69,7 @@ class PlayerShotSpec extends AnyWordSpec, Matchers:
         case Right(state: GameState) =>
           state.shotgun.shells mustBe ShellDistribution(live = Nat[2], blank = Nat[3])
           state.knowledge mustBe Knowledge(
-            dealer = BeliefState.fromUnique(
+            dealer = BeliefState.unsafe(
               Chance.CoinFlip -> Revealed(Shell2 -> Blank),
               Chance.CoinFlip -> Revealed(
                 Shell1 -> Live,

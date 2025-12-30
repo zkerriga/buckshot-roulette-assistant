@@ -21,8 +21,7 @@ object PlayerShot:
             .conditioning: revealed =>
               Chance.certainUnless:
                 missOnShellOut(revealed, old = state.shotgun, updated = table.shotgun, out = shot.shell)
-            .transform: revealed =>
-              BeliefState.deterministic(revealed.afterShellOut)
+            .update(_.afterShellOut)
 
           GameState(
             public = table,

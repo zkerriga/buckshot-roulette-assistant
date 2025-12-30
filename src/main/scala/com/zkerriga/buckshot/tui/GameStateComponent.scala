@@ -115,14 +115,12 @@ object GameStateComponent:
   private def revealed(states: BeliefState[Revealed], shotgun: Shotgun): Panel =
     val shellsToShow = Seq(Shell1, Shell2, Shell3, Shell4, Shell5, Shell6, Shell7, Shell8).take(shotgun.total)
     Panel(LinearLayout(Direction.VERTICAL)).withSeq:
-      states.states.toSeq
-        .sortBy(_.chance)
-        .map: possible =>
-          Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-            Label("Knows"),
-            shells(shellsToShow.map(possible.value.get)),
-            Label(if possible.chance != Chance.Certain then possible.chance.show else ""),
-          )
+      states.asSortedSeq.map: (chance, revealed) =>
+        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+          Label("Knows"),
+          shells(shellsToShow.map(revealed.get)),
+          Label(if chance != Chance.Certain then chance.show else ""),
+        )
 
   private def health(current: Health, limit: HealthLimit): Label =
     Label(("☇" * current).padTo(limit, '-').reverse)

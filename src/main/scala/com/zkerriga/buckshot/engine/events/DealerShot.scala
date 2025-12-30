@@ -31,8 +31,7 @@ object DealerShot:
                     val ifGuessedBlank = Chance.certainWhen(shot.target == Dealer)
                     val ifGuessedLive = Chance.certainWhen(live == Action.Shoot(Player) && shot.target == Player)
                     (ifGuessedBlank and Chance.CoinFlip) or (ifGuessedLive and Chance.CoinFlip)
-            .transform: revealed =>
-              BeliefState.deterministic(revealed.afterShellOut)
+            .update(_.afterShellOut)
 
           GameState(
             public = table,
