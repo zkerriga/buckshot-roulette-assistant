@@ -1,6 +1,7 @@
 package com.zkerriga.buckshot.engine
 
 import cats.Eq
+import com.zkerriga.buckshot.engine.EngineError.V
 import com.zkerriga.types.Chance
 
 opaque type BeliefState[+A] = Distribution[A]
@@ -22,12 +23,11 @@ object BeliefState:
       *   is a function that given a value of type [[A]] returns how possible is this value based on some new
       *   observation
       */
-    def conditioning(howPossible: A => Chance): BeliefState[A] =
+    def conditioning(howPossible: A => Chance): V[BeliefState[A]] =
       belief
         .updateChances: (chance, value) =>
           chance and howPossible(value)
-        // todo: figure out proper error handling
-        .getOrElse(throw IllegalStateException("conditioning led to an impossible belief state"))
+        .toRight(EngineError.BadConditioning)
 
     /** transform deterministically without changing the probabilities
       */

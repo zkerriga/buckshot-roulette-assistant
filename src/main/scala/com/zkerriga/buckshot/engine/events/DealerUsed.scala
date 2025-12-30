@@ -2,6 +2,7 @@ package com.zkerriga.buckshot.engine.events
 
 import cats.data.NonEmptySeq
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
+import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.ai.DealerAi.Action
 import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
@@ -9,7 +10,6 @@ import com.zkerriga.buckshot.engine.{BeliefState, Distribution}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used
 import com.zkerriga.buckshot.game.events.Used.ItemUse
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.V
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.types.{Chance, Nat}
@@ -18,32 +18,32 @@ object DealerUsed:
   def execute(state: GameState, used: Used[Dealer.type]): V[GameOver | Reset | GameState] =
     Used
       .execute(state.public, used)
-      .map:
-        case outcome: (GameOver | Reset) => outcome
+      .flatMap:
+        case outcome: (GameOver | Reset) => outcome.ok
         case table: TableState =>
-          GameState(
+          for adjustedDealerKnowledge <- state.knowledge.dealer.conditioning(condition(state, table, used))
+          yield GameState(
             public = table,
             knowledge = Knowledge(
-              dealer = transformDealer(state.knowledge.player, table, used.item)(conditionDealer(state, table, used)),
+              dealer = transformDealer(state.knowledge.player, table, used.item)(adjustedDealerKnowledge),
               player = updatePlayerKnowledge(state.knowledge.player, used.item),
             ),
           )
 
-  private def conditionDealer(oldState: GameState, table: TableState, used: Used[Dealer.type]): BeliefState[Revealed] =
-    oldState.knowledge.dealer.conditioning: knowledge =>
-      val beerMiss = used.item match
-        case ItemUse.Beer(out) => missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out)
-        case _ => false
+  private def condition(oldState: GameState, table: TableState, used: Used[Dealer.type])(knowledge: Revealed): Chance =
+    val beerMiss = used.item match
+      case ItemUse.Beer(out) => missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out)
+      case _ => false
 
-      if beerMiss then Chance.NoChance
-      else
-        DealerAi.next(oldState.public, knowledge) match
-          case Action.Use(item, steal) => Chance.certainWhen(item == used.item && steal == used.stolen)
-          case Action.Shoot(_) => Chance.NoChance
-          case Action.Guess(live, Action.Shoot(Dealer)) =>
-            live match
-              case Action.Use(Saw, false) => Chance.certainWhen(used.item == Saw && !used.stolen) and Chance.CoinFlip
-              case Action.Shoot(Player) => Chance.NoChance
+    if beerMiss then Chance.NoChance
+    else
+      DealerAi.next(oldState.public, knowledge) match
+        case Action.Use(item, steal) => Chance.certainWhen(item == used.item && steal == used.stolen)
+        case Action.Shoot(_) => Chance.NoChance
+        case Action.Guess(live, Action.Shoot(Dealer)) =>
+          live match
+            case Action.Use(Saw, false) => Chance.certainWhen(used.item == Saw && !used.stolen) and Chance.CoinFlip
+            case Action.Shoot(Player) => Chance.NoChance
 
   private def transformDealer(
     player: Revealed,

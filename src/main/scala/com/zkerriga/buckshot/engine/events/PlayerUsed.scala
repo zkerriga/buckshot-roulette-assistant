@@ -2,11 +2,11 @@ package com.zkerriga.buckshot.engine.events
 
 import com.zkerriga.buckshot.engine.BeliefState
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.{missOnGlassReveal, missOnPhoneReveal, missOnShellOut}
+import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.events.PlayerUsed.ItemUse
 import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.V
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.buckshot.game.state.partitipant.Side.Player
@@ -28,13 +28,14 @@ object PlayerUsed:
   def execute(state: GameState, used: PlayerUsed): V[GameOver | Reset | GameState] =
     Used
       .execute(state.public, Used(Player, ItemUse.asPublic(used.item), used.stolen))
-      .map:
-        case outcome: (GameOver | Reset) => outcome
+      .flatMap:
+        case outcome: (GameOver | Reset) => outcome.ok
         case table: TableState =>
-          GameState(
+          for dealerKnowledge <- updateDealerKnowledge(state, table, used.item)(state.knowledge.dealer)
+          yield GameState(
             public = table,
             knowledge = Knowledge(
-              dealer = updateDealerKnowledge(state.knowledge.dealer, used.item, state, table),
+              dealer = dealerKnowledge,
               player = updatePlayerKnowledge(state.knowledge.player, used.item),
             ),
           )
@@ -47,11 +48,10 @@ object PlayerUsed:
       case _ => knowledge
 
   private def updateDealerKnowledge(
-    belief: BeliefState[Revealed],
-    item: ItemUse,
     oldState: GameState,
     table: TableState,
-  ): BeliefState[Revealed] =
+    item: ItemUse,
+  )(belief: BeliefState[Revealed]): V[BeliefState[Revealed]] =
     item match
       case ItemUse.MagnifyingGlass(revealed) =>
         belief.conditioning: knowledge =>
@@ -62,12 +62,11 @@ object PlayerUsed:
           Chance.certainUnless(missOnPhoneReveal(knowledge, table.shotgun, revealed, at))
 
       case ItemUse.Beer(out) =>
-        belief
-          .conditioning: knowledge =>
+        for adjusted <- belief.conditioning: knowledge =>
             Chance.certainUnless(missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out))
-          .update(_.afterShellOut)
+        yield adjusted.update(_.afterShellOut)
 
-      case _ => belief
+      case _ => belief.ok
 
   private object ItemUse:
     val asPublic: ItemUse => Used.ItemUse =
