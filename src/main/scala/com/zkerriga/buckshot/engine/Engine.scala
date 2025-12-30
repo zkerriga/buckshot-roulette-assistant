@@ -106,4 +106,6 @@ object Engine extends Logging:
 
   case class DealerPrediction(actions: Distribution[Vector[Action]])
 
-  def start(table: TableState): Engine = Engine(Ref.of(GameState.initial(table)))
+  def start(table: TableState): Engine =
+    log.info(s"starting engine with $table")
+    Engine(Ref.of(GameState.initial(table)))
