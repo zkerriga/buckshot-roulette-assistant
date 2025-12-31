@@ -25,21 +25,22 @@ object domain {
 
   import IdeaComponent.*
 
-  object A1Choice extends Choice[ALevel.A1.type, Letter.A.type, Result] {
+  case object A1Choice extends Choice[ALevel.A1.type, Letter.A.type, Result] {
     override def label: Label = Label("A1")
     override def value: ALevel.A1.type = ALevel.A1
-    override def next(acc: Accumulated[Letter.A.type]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value, value))
+    override def next(acc: Letter.A.type): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc, value))
   }
 
-  object A2Choice extends Choice[ALevel.A2.type, Letter.A.type, Result] {
+  case object A2Choice extends Choice[ALevel.A2.type, Letter.A.type, Result] {
     override def label: Label = Label("A2")
     override def value: ALevel.A2.type = ALevel.A2
-    override def next(acc: Accumulated[Letter.A.type]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value, value))
+    override def next(acc: Letter.A.type): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc, value))
   }
 
-  object ALevelSelect extends Select[ALevel, Letter.A.type, Result] {
+  case object ALevelSelect extends Select[ALevel, Letter.A.type, Result] {
+    override def description: Option[Label] = Some(Label("with level"))
     override def options: List[Choice[ALevel, Letter.A.type, Result]] =
       List(
         A1Choice,
@@ -47,57 +48,56 @@ object domain {
       )
   }
 
-  object AChoice extends Choice[Letter.A.type, Unit, Result] {
+  case object AChoice extends Choice[Letter.A.type, Unit, Result] {
     override def label: Label = Label("A")
     override def value: Letter.A.type = Letter.A
-    override def next(acc: Accumulated[Unit]): ChoiceContinuation[Result] =
-      ChoiceContinuation.NextChoice(Accumulated(value, acc.rendered :+ label), ALevelSelect)
+    override def next(acc: Unit): ChoiceContinuation[Result] =
+      ChoiceContinuation.NextChoice(value, ALevelSelect)
   }
 
-  object B1Choice extends Choice[BLevel.B1.type, Letter.B.type, Result] {
+  case object B1Choice extends Choice[BLevel.B1.type, Letter.B.type, Result] {
     override def label: Label = Label("B1")
     override def value: BLevel.B1.type = BLevel.B1
-    override def next(acc: Accumulated[Letter.B.type]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value, value))
+    override def next(acc: Letter.B.type): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc, value))
   }
 
-  object B21Choice extends Choice[B2Stage.B21.type, (Letter.B.type, BLevel.B2.type), Result] {
+  case object B21Choice extends Choice[B2Stage.B21.type, (Letter.B.type, BLevel.B2.type), Result] {
     override def label: Label = Label("B21")
     override def value: B2Stage.B21.type = B2Stage.B21
-    override def next(acc: Accumulated[(Letter.B.type, BLevel.B2.type)]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value._1, acc.value._2, value))
+    override def next(acc: (Letter.B.type, BLevel.B2.type)): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc._1, acc._2, value))
   }
 
-  object B22Choice extends Choice[B2Stage.B22.type, (Letter.B.type, BLevel.B2.type), Result] {
+  case object B22Choice extends Choice[B2Stage.B22.type, (Letter.B.type, BLevel.B2.type), Result] {
     override def label: Label = Label("B22")
     override def value: B2Stage.B22.type = B2Stage.B22
-    override def next(acc: Accumulated[(Letter.B.type, BLevel.B2.type)]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value._1, acc.value._2, value))
+    override def next(acc: (Letter.B.type, BLevel.B2.type)): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc._1, acc._2, value))
   }
 
-  object B2StageSelect extends Select[B2Stage, (Letter.B.type, BLevel.B2.type), Result] {
+  case object B2StageSelect extends Select[B2Stage, (Letter.B.type, BLevel.B2.type), Result] {
+    override def description: Option[Label] = Some(Label("with stage"))
     override def options: List[Choice[B2Stage, (Letter.B.type, BLevel.B2.type), Result]] =
       List(B21Choice, B22Choice)
   }
 
-  object B2Choice extends Choice[BLevel.B2.type, Letter.B.type, Result] {
+  case object B2Choice extends Choice[BLevel.B2.type, Letter.B.type, Result] {
     override def label: Label = Label("B2")
     override def value: BLevel.B2.type = BLevel.B2
-    override def next(acc: Accumulated[Letter.B.type]): ChoiceContinuation[Result] =
-      ChoiceContinuation.NextChoice[B2Stage, (Letter.B.type, BLevel.B2.type), Result](
-        Accumulated((acc.value, value), acc.rendered :+ label),
-        B2StageSelect,
-      )
+    override def next(acc: Letter.B.type): ChoiceContinuation[Result] =
+      ChoiceContinuation.NextChoice[B2Stage, (Letter.B.type, BLevel.B2.type), Result]((acc, value), B2StageSelect)
   }
 
-  object B3Choice extends Choice[BLevel.B3.type, Letter.B.type, Result] {
+  case object B3Choice extends Choice[BLevel.B3.type, Letter.B.type, Result] {
     override def label: Label = Label("B3")
     override def value: BLevel.B3.type = BLevel.B3
-    override def next(acc: Accumulated[Letter.B.type]): ChoiceContinuation[Result] =
-      ChoiceContinuation.Ready((acc.value, value))
+    override def next(acc: Letter.B.type): ChoiceContinuation[Result] =
+      ChoiceContinuation.Ready((acc, value))
   }
 
-  object BLevelSelect extends Select[BLevel, Letter.B.type, Result] {
+  case object BLevelSelect extends Select[BLevel, Letter.B.type, Result] {
+    override def description: Option[Label] = Some(Label("with level"))
     override def options: List[Choice[BLevel, Letter.B.type, Result]] =
       List(
         B1Choice,
@@ -106,24 +106,31 @@ object domain {
       )
   }
 
-  object BChoice extends Choice[Letter.B.type, Unit, Result] {
+  case object BChoice extends Choice[Letter.B.type, Unit, Result] {
     override def label: Label = Label("B")
     override def value: Letter.B.type = Letter.B
-    override def next(acc: Accumulated[Unit]): ChoiceContinuation[Result] =
-      ChoiceContinuation.NextChoice[BLevel, Letter.B.type, Result](
-        Accumulated(value, acc.rendered :+ label),
-        BLevelSelect,
-      )
+    override def next(acc: Unit): ChoiceContinuation[Result] =
+      ChoiceContinuation.NextChoice[BLevel, Letter.B.type, Result](value, BLevelSelect)
   }
 
-  object StartSelect extends Select[Letter, Unit, Result] {
+  case object StartSelect extends Select[Letter, Unit, Result] {
     override def options: List[Choice[Letter, Unit, Result]] =
       List(AChoice, BChoice)
   }
 
-  def initial(someGameData: Boolean): ChoiceContinuation[Result] =
-    if someGameData then BChoice.next(Accumulated((), List(Label("Start with B"))))
-    else ChoiceContinuation.NextChoice(Accumulated((), List()), StartSelect)
+  def initial(someGameData: Boolean): InputState[Result] =
+    if someGameData then
+      InputState.Choose[BLevel, Letter.B.type, Result](
+        None,
+        Accumulated(Letter.B, List(Label("Start with B"))),
+        BLevelSelect,
+      )
+    else
+      InputState.Choose[Letter, Unit, Result](
+        None,
+        Accumulated((), List()),
+        StartSelect,
+      )
 }
 
 object IdeaComponent {
@@ -137,15 +144,16 @@ object IdeaComponent {
   sealed trait ChoiceContinuation[R]
   object ChoiceContinuation {
     case class Ready[R](result: R) extends ChoiceContinuation[R]
-    case class NextChoice[A, Acc, R](acc: Accumulated[Acc], select: Select[A, Acc, R]) extends ChoiceContinuation[R]
+    case class NextChoice[A, Acc, R](acc: Acc, select: Select[A, Acc, R]) extends ChoiceContinuation[R]
   }
 
   trait Choice[+A, Acc, R]:
     def label: Label
     def value: A
-    def next(acc: Accumulated[Acc]): ChoiceContinuation[R]
+    def next(acc: Acc): ChoiceContinuation[R]
 
   trait Select[A, Acc, R]:
+    def description: Option[Label] = None
     def options: List[Choice[A, Acc, R]]
 
   case class Accumulated[Acc](value: Acc, rendered: List[Label])
@@ -181,13 +189,36 @@ object IdeaComponent {
           select.options.map { choice =>
             Button.Next(
               choice.label,
-              choice.next(acc) match {
+              choice.next(acc.value) match {
                 case ChoiceContinuation.Ready(result) => InputState.ReadyToSubmit(state, result)
-                case ChoiceContinuation.NextChoice(acc, select) => InputState.Choose(Some(state), acc, select)
+                case ChoiceContinuation.NextChoice(accValue, select) =>
+                  InputState.Choose(
+                    Some(state),
+                    Accumulated(accValue, acc.rendered :+ choice.label :++ select.description),
+                    select,
+                  )
               },
             )
           },
           undo.map(Button.Undo[R]).toList,
         ).flatten
     }
+}
+
+object Test extends App {
+  val state = domain.initial(someGameData = false)
+
+  println(IdeaComponent.renderAccumulatedCommand(state))
+  val buttons = IdeaComponent.renderButtons(state)
+  println(buttons)
+
+  val nextButtons =
+    IdeaComponent.renderButtons(buttons(1).asInstanceOf[IdeaComponent.Button.Next[domain.Result]].setNext)
+
+  println(
+    IdeaComponent.renderAccumulatedCommand(
+      nextButtons(1).asInstanceOf[IdeaComponent.Button.Next[domain.Result]].setNext,
+    ),
+  )
+  println(nextButtons)
 }
