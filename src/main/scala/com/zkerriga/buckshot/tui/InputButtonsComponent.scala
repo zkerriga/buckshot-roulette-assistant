@@ -12,6 +12,8 @@ object InputButtonsComponent:
       def onClickFinalizeTo[R](using builder: AccBuilder[Acc, A, R]): Choice[A, Acc, R] =
         Choice(element, acc => Requires.Ready(builder.build(acc, element.value)))
 
+      def onClick[R](f: Acc => Requires[R]): Choice[A, Acc, R] = Choice(element, f)
+
       def onClickContinueTo[B, Acc2, R](
         select: Select[B, Acc2, R],
       )(using builder: AccBuilder[Acc, A, Acc2]): Choice[A, Acc, R] =
@@ -29,10 +31,18 @@ object InputButtonsComponent:
     case class NextChoice[A, Acc, R](acc: Acc, select: Select[A, Acc, R]) extends Requires[R]
     case class Ready[R](result: R) extends Requires[R]
 
-  case class Choice[A, Acc, +R](
-    element: ChoiceElement[A],
+    def next[A, Acc, R](select: Select[A, Acc, R])(on: Acc): NextChoice[A, Acc, R] = NextChoice(on, select)
+
+  case class Choice[+A, Acc, +R](
+    value: A,
+    text: String,
+    label: Label,
     onClick: Acc => Requires[R],
   )
+  object Choice:
+    def apply[A, Acc, R](element: ChoiceElement[A], onClick: Acc => Requires[R]): Choice[A, Acc, R] =
+      Choice(element.value, element.text, element.label, onClick)
+
   case class Select[A, Acc, +R](
     description: Option[Label],
     options: Seq[Choice[A, Acc, R]],
@@ -85,7 +95,7 @@ object InputButtonsComponent:
           val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
           Panel(GridLayout(bestGridColumns)).withSeq:
             select.options.map: choice =>
-              button(choice.element.text) {
+              button(choice.text) {
                 components.update {
                   choice.onClick(acc.value) match
                     case Requires.NextChoice(accValue, select) =>
@@ -93,7 +103,7 @@ object InputButtonsComponent:
                         undo = Some(input),
                         acc = Accumulated(
                           value = accValue,
-                          labels = acc.labels :+ choice.element.label :++ select.description,
+                          labels = acc.labels :+ choice.label :++ select.description,
                         ),
                         select = select,
                       )
