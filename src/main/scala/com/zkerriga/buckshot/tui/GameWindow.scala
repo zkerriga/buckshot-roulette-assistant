@@ -17,7 +17,7 @@ object GameWindow:
     engine.getState match
       case Left(error) => Panel().withAll(Label(error))
       case Right(game) =>
-        val gameStateDynamic = DynamicComponent.of(game, GameStateComponent.render)
+        val gameStateDynamic = DynamicComponent.updatable(game)(GameStateComponent.render)
         Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
           gameStateDynamic.component,
           EmptySpace(),

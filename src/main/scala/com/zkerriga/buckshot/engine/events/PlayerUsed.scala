@@ -68,8 +68,8 @@ object PlayerUsed:
 
       case _ => belief.ok
 
-  private object ItemUse:
-    val asPublic: ItemUse => Used.ItemUse =
+  object ItemUse:
+    private[PlayerUsed] val asPublic: ItemUse => Used.ItemUse =
       case ItemUse.Handcuffs => Used.ItemUse.Handcuffs
       case ItemUse.MagnifyingGlass(revealed) => Used.ItemUse.MagnifyingGlass
       case ItemUse.Beer(out) => Used.ItemUse.Beer(out)
