@@ -1,368 +1,351 @@
 package com.zkerriga.buckshot.tui
 
 import cats.syntax.all.*
-import com.googlecode.lanterna.gui2.*
-import com.zkerriga.buckshot.engine.Engine
-import com.zkerriga.buckshot.engine.events.PlayerUsed
+import com.googlecode.lanterna.gui2.{Component, Label}
+import com.zkerriga.buckshot.engine.events.PlayerUsed.ItemUse as FullItemUse
 import com.zkerriga.buckshot.game.accessors.Opposition
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.Used.{ItemUse, execute}
-import com.zkerriga.buckshot.game.events.{Shot, Used}
-import com.zkerriga.buckshot.game.state.partitipant.Side
-import com.zkerriga.buckshot.game.state.shotgun
+import com.zkerriga.buckshot.game.events.Used.ItemUse
+import com.zkerriga.buckshot.game.state.items.Item
+import com.zkerriga.types.Nat
+
+import scala.NamedTuple.{AnyNamedTuple, Concat}
 
 object InputComponent:
-  trait Submit:
-    def event(event: Engine.Event): Unit
+  enum Event:
+    case DealerShot(target: Side, shell: Shell)
+    case PlayerShot(target: Side, shell: Shell)
+    case DealerUsed(item: ItemUse, stolen: Boolean)
+    case PlayerUsed(item: FullItemUse, stolen: Boolean)
 
-  def render(game: TableState, submit: Submit): Component =
+  trait Submit:
+    def event(event: Event): Unit
+
+  import InputButtonsComponent.*
+
+  def render(game: TableState, submit: Submit): Component = {
     given Opposition[TableState] = game.turn match
       case Player => Opposition.of(actorIs = _.player, opponentIs = _.dealer)
       case Dealer => Opposition.of(actorIs = _.dealer, opponentIs = _.player)
-    DynamicComponent
-      .selfUpdatableOnly(Input.from(game)) { (input, update) =>
-        Panel(GridLayout(2)).withAll(
-          Label("Command"),
-          command(game, input),
-          EmptySpace(),
-          buttons(game, input, update, submit),
+
+    val actorItems = game.actor.items
+    val opponentItems = game.opponent.items
+
+    def cannotUseAnyItem: Boolean =
+      actorItems.empty ||
+        actorItems.asSet == Set(Adrenaline) && (opponentItems.empty || opponentItems.asSet == Set(Adrenaline))
+
+    val initial: InputState.Choose[?, ?, Event] =
+      if cannotUseAnyItem then
+        InputState.Choose(
+          undo = None,
+          acc = Accumulated((actor = game.turn), List(ShotChoice.label)),
+          select = TargetSelect,
         )
-      }
-      .withBorder(Borders.singleLine("Input"))
-
-  private enum Input:
-    case ChooseEvent
-    case ShotSet(input: InputTarget, undoDisabled: Boolean)
-    case UsedSet(input: InputItem)
-
-  private enum InputTarget:
-    case ChooseTarget
-    case TargetSet(target: Side, input: InputShell)
-
-  private enum InputShell:
-    case ChooseShell
-    case ShellSet(shell: Shell) // end of input
-
-  private enum InputItem:
-    case ChooseItem
-    case SimpleItemSet(item: Handcuffs.type | Cigarettes.type | Saw.type | Inverter.type) // end of input
-    case MagnifyingGlassSet(item: MagnifyingGlass.type, input: Option[InputShell])
-    case BeerSet(item: Beer.type, input: InputShell)
-    case BurnerPhoneSet(item: BurnerPhone.type, input: Option[InputSeqNr])
-    case MedsSet(item: Meds.type, input: InputMedsQuality)
-    case AdrenalineSet(input: InputItemToSteal)
-
-  private enum InputItemToSteal:
-    case ChooseItem
-    case SimpleItemSet(item: Handcuffs.type | Cigarettes.type | Saw.type | Inverter.type) // end of input
-    case MagnifyingGlassSet(item: MagnifyingGlass.type, input: Option[InputShell])
-    case BeerSet(item: Beer.type, input: InputShell)
-    case BurnerPhoneSet(item: BurnerPhone.type, input: Option[InputSeqNr])
-    case MedsSet(item: Meds.type, input: InputMedsQuality)
-
-  private enum InputSeqNr:
-    case ChooseSeqNr
-    case SeqNrSet(seqNr: SeqNr, input: InputShell)
-
-  private enum InputMedsQuality:
-    case ChooseQuality
-    case QualitySet(good: Boolean) // end of input
-
-  private object Input:
-    def from(game: TableState)(using Opposition[TableState]): Input =
-      if game.actor.items.empty then Input.ShotSet(InputTarget.ChooseTarget, undoDisabled = true)
-      else Input.ChooseEvent
-
-  private def buttons(
-    game: TableState,
-    input: Input,
-    components: DynamicComponent.Update[Input],
-    submit: Submit,
-  )(using Opposition[TableState]): Panel =
-    input match {
-      case Input.ChooseEvent =>
-        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-          button("Shot") {
-            components.update(Input.ShotSet(InputTarget.ChooseTarget, undoDisabled = false))
-          },
-          button("Used") {
-            components.update(Input.UsedSet(InputItem.ChooseItem))
-          },
+      else
+        InputState.Choose(
+          undo = None,
+          acc = Accumulated((actor = game.turn), List()),
+          select = eventTypeSelect(
+            actorItems = actorItems,
+            opponentItems = opponentItems,
+            shotgun = game.shotgun,
+          ),
         )
+    InputButtonsComponent.render(initial, result => submit.event(result))
+  }
 
-      case shotSet @ Input.ShotSet(input, undoDisabled) =>
-        input match {
-          case InputTarget.ChooseTarget =>
-            Panel(LinearLayout(Direction.HORIZONTAL)).withSeq:
-              Seq(
-                button("Dealer") {
-                  components.update(shotSet.copy(input = InputTarget.TargetSet(Dealer, InputShell.ChooseShell)))
-                }.some,
-                button("Player") {
-                  components.update(shotSet.copy(input = InputTarget.TargetSet(Player, InputShell.ChooseShell)))
-                }.some,
-                Option.unless(undoDisabled)(undoButton {
-                  components.update(Input.ChooseEvent)
-                }),
-              ).flatten
+  private val LiveChoice = ChoiceElement.of(Live, "Live")
+  private val BlankChoice = ChoiceElement.of(Blank, "Blank")
 
-          case targetSet @ InputTarget.TargetSet(target, input) =>
-            input match {
-              case InputShell.ChooseShell =>
-                Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                  liveButton {
-                    components.update(shotSet.copy(input = targetSet.copy(input = InputShell.ShellSet(Live))))
-                  },
-                  blankButton {
-                    components.update(shotSet.copy(input = targetSet.copy(input = InputShell.ShellSet(Blank))))
-                  },
-                  undoButton {
-                    components.update(shotSet.copy(input = InputTarget.ChooseTarget))
-                  },
-                )
+  private val PlayerChoice = ChoiceElement.of(Player, "Player")
+  private val DealerChoice = ChoiceElement.of(Dealer, "Dealer")
 
-              case InputShell.ShellSet(shell) =>
-                Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                  submitButton {
-                    submit.event(Shot(game.turn, target, shell))
-                  },
-                  undoButton {
-                    components.update(shotSet.copy(input = targetSet.copy(input = InputShell.ChooseShell)))
-                  },
-                )
-            }
-        }
+  private enum EventType:
+    case Shot, Used
 
-      case usedSet @ Input.UsedSet(input) =>
-        input match {
-          case InputItem.ChooseItem =>
-            Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-              Panel(LinearLayout(Direction.VERTICAL)).withSeq {
-                val items = game.actor.items.asSet.toVector.sortBy(_.toString)
-                items.map:
-                  case Adrenaline =>
-                    adrenalineButton {
-                      components.update(usedSet.copy(input = InputItem.AdrenalineSet(InputItemToSteal.ChooseItem)))
-                    }
-                  case Handcuffs =>
-                    handcuffsButton {
-                      components.update(usedSet.copy(input = InputItem.SimpleItemSet(Handcuffs)))
-                    }
-                  case MagnifyingGlass =>
-                    magnifyingGlassButton {
-                      components.update(
-                        usedSet.copy(input =
-                          InputItem.MagnifyingGlassSet(
-                            MagnifyingGlass,
-                            Option.when(game.turn == Player)(InputShell.ChooseShell),
-                          ),
-                        ),
-                      )
-                    }
-                  case Beer =>
-                    beerButton {
-                      components.update(usedSet.copy(input = InputItem.BeerSet(Beer, InputShell.ChooseShell)))
-                    }
-                  case Cigarettes =>
-                    cigarettesButton {
-                      components.update(usedSet.copy(input = InputItem.SimpleItemSet(Cigarettes)))
-                    }
-                  case Saw =>
-                    sawButton {
-                      components.update(usedSet.copy(input = InputItem.SimpleItemSet(Saw)))
-                    }
-                  case Inverter =>
-                    inverterButton {
-                      components.update(usedSet.copy(input = InputItem.SimpleItemSet(Inverter)))
-                    }
-                  case BurnerPhone =>
-                    burnerPhoneButton {
-                      components.update(
-                        usedSet.copy(input =
-                          InputItem.BurnerPhoneSet(
-                            BurnerPhone,
-                            Option.when(game.turn == Player)(InputSeqNr.ChooseSeqNr),
-                          ),
-                        ),
-                      )
-                    }
-                  case Meds =>
-                    medsButton {
-                      components.update(usedSet.copy(input = InputItem.MedsSet(Meds, InputMedsQuality.ChooseQuality)))
-                    }
-              },
-              undoButton {
-                components.update(Input.ChooseEvent)
-              },
-            )
-          case InputItem.SimpleItemSet(item) =>
-            Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-              submitButton {
-                game.turn match
-                  case Player =>
-                    val itemUse = item match
-                      case Handcuffs => PlayerUsed.ItemUse.Handcuffs
-                      case Cigarettes => PlayerUsed.ItemUse.Cigarettes
-                      case Saw => PlayerUsed.ItemUse.Saw
-                      case Inverter => PlayerUsed.ItemUse.Inverter
-                    submit.event(PlayerUsed(itemUse, stolen = false))
-                  case Dealer =>
-                    val itemUse = item match
-                      case Handcuffs => ItemUse.Handcuffs
-                      case Cigarettes => ItemUse.Cigarettes
-                      case Saw => ItemUse.Saw
-                      case Inverter => ItemUse.Inverter
-                    submit.event(Used(Dealer, itemUse, stolen = false))
-              },
-              undoButton {
-                components.update(usedSet.copy(input = InputItem.ChooseItem))
-              },
-            )
-          case glassSet @ InputItem.MagnifyingGlassSet(_, input) =>
-            input match {
-              case Some(input) =>
-                input match {
-                  case InputShell.ChooseShell =>
-                    Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                      liveButton {
-                        components.update(usedSet.copy(input = glassSet.copy(input = InputShell.ShellSet(Live).some)))
-                      },
-                      blankButton {
-                        components.update(usedSet.copy(input = glassSet.copy(input = InputShell.ShellSet(Blank).some)))
-                      },
-                      undoButton {
-                        components.update(usedSet.copy(input = InputItem.ChooseItem))
-                      },
-                    )
-                  case InputShell.ShellSet(shell) => ???
-                }
-              case None =>
-                Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                  submitButton {
-                    submit.event(Used(Dealer, ItemUse.MagnifyingGlass, stolen = false))
-                  },
-                  undoButton {
-                    components.update(usedSet.copy(input = InputItem.ChooseItem))
-                  },
-                )
-            }
-          case InputItem.BeerSet(item, input) => ???
-          case InputItem.BurnerPhoneSet(item, input) => ???
-          case InputItem.MedsSet(item, input) => ???
-          case InputItem.AdrenalineSet(input) => ???
-        }
+  private type Shot = EventType.Shot.type
+  private type Used = EventType.Used.type
+
+  private val ShotChoice = ChoiceElement.of(EventType.Shot, "shot")
+  private val UsedChoice = ChoiceElement.of(EventType.Used, "used")
+
+  private val AdrenalineChoice = ChoiceElement.of(Adrenaline, "Adrenaline")
+  private val HandcuffsChoice = ChoiceElement.of(Handcuffs, "Handcuffs")
+  private val MagnifyingGlassChoice = ChoiceElement.of(MagnifyingGlass, "Magnifying Glass")
+  private val BeerChoice = ChoiceElement.of(Beer, "Beer")
+  private val CigarettesChoice = ChoiceElement.of(Cigarettes, "Cigarettes")
+  private val SawChoice = ChoiceElement.of(Saw, "Saw")
+  private val InverterChoice = ChoiceElement.of(Inverter, "Inverter")
+  private val BurnerPhoneChoice = ChoiceElement.of(BurnerPhone, "Burner Phone")
+  private val MedsChoice = ChoiceElement.of(Meds, "Meds")
+
+  private enum MedsQuality:
+    case Good, Bad
+
+  private val GoodMedsChoice = ChoiceElement.of(MedsQuality.Good, "Good")
+  private val BadMedsChoice = ChoiceElement.of(MedsQuality.Bad, "Bad")
+
+  private val NoShellChoice = ChoiceElement.of(None, "nothing")
+  private val Shell2Choice = ChoiceElement.of(Shell2, "2d shell")
+  private val Shell3Choice = ChoiceElement.of(Shell3, "3d shell")
+  private val Shell4Choice = ChoiceElement.of(Shell4, "4th shell")
+  private val Shell5Choice = ChoiceElement.of(Shell5, "5th shell")
+  private val Shell6Choice = ChoiceElement.of(Shell6, "6th shell")
+  private val Shell7Choice = ChoiceElement.of(Shell7, "7th shell")
+  private val Shell8Choice = ChoiceElement.of(Shell8, "8th shell")
+
+  private val ShotShellSelect =
+    shellSelect[Actor ++ Target, Event.DealerShot | Event.PlayerShot](description = Label("with")) { (state, shell) =>
+      state.actor match
+        case Player => Event.PlayerShot(target = state.target, shell = shell)
+        case Dealer => Event.DealerShot(target = state.target, shell = shell)
     }
 
-  private val adrenalineButton = button("Adrenaline")
-  private val handcuffsButton = button("Handcuffs")
-  private val magnifyingGlassButton = button("Magnifying Glass")
-  private val beerButton = button("Beer")
-  private val cigarettesButton = button("Cigarettes")
-  private val sawButton = button("Saw")
-  private val inverterButton = button("Inverter")
-  private val burnerPhoneButton = button("Burner Phone")
-  private val medsButton = button("Meds")
-
-  private val liveButton = button("Live")
-  private val blankButton = button("Blank")
-
-  private def undoButton(onClick: => Unit): Component =
-    button("| undo |")(onClick)
-
-  private def submitButton(onClick: => Unit): Component =
-    button("| submit |")(onClick)
-
-  private def button(name: String)(onClick: => Unit): Button = Button(name, () => onClick)
-
-  private def command(game: TableState, input: Input)(using Opposition[TableState]): Panel =
-    Panel(LinearLayout(Direction.HORIZONTAL)).withSeq(
-      Label(game.turn.toString) :: (input match {
-        case Input.ChooseEvent => List(Label("_"))
-
-        case Input.ShotSet(input, undoDisabled) =>
-          Label("shot") :: (input match {
-            case InputTarget.ChooseTarget => List(Label("_"))
-            case InputTarget.TargetSet(target, input) =>
-              Label(target.toString) :: Label("with") :: List(input match {
-                case InputShell.ChooseShell => Label("_")
-                case InputShell.ShellSet(shell) => Label(shell.toString)
-              })
-          })
-
-        case Input.UsedSet(input) =>
-          Label("used") :: (input match {
-            case InputItem.ChooseItem => List(Label("_"))
-            case InputItem.SimpleItemSet(item) => List(Label(item.toString))
-            case InputItem.MagnifyingGlassSet(item, input) =>
-              Label("Magnifying Glass") :: (input match {
-                case Some(input) =>
-                  Label("and revealed") :: List(input match {
-                    case InputShell.ChooseShell => Label("_")
-                    case InputShell.ShellSet(shell) => Label(shell.toString)
-                  })
-                case None => Nil
-              })
-            case InputItem.BeerSet(item, input) =>
-              Label("Beer") :: Label("and removed") :: List(input match {
-                case InputShell.ChooseShell => Label("_")
-                case InputShell.ShellSet(shell) => Label(shell.toString)
-              })
-            case InputItem.BurnerPhoneSet(item, input) =>
-              Label("Burner Phone") :: (input match {
-                case Some(input) =>
-                  Label("and on spot") :: (input match {
-                    case InputSeqNr.ChooseSeqNr => List(Label("_"))
-                    case InputSeqNr.SeqNrSet(seqNr, input) =>
-                      Label(seqNr.toString) :: Label("revealed") :: List(input match {
-                        case InputShell.ChooseShell => Label("_")
-                        case InputShell.ShellSet(shell) => Label(shell.toString)
-                      })
-                  })
-                case None => Nil
-              })
-            case InputItem.MedsSet(item, input) =>
-              Label("Meds") :: Label("and") :: List(input match {
-                case InputMedsQuality.ChooseQuality => Label("_")
-                case InputMedsQuality.QualitySet(good) => Label(if good then "healed" else "damaged")
-              })
-
-            case InputItem.AdrenalineSet(input) =>
-              Label("Adrenaline") :: Label("and stole") :: (input match {
-                case InputItemToSteal.ChooseItem => List(Label("_"))
-                case InputItemToSteal.SimpleItemSet(item) => List(Label(item.toString))
-                case InputItemToSteal.MagnifyingGlassSet(item, input) =>
-                  Label("Magnifying Glass") :: (input match {
-                    case Some(input) =>
-                      Label("and revealed") :: List(input match {
-                        case InputShell.ChooseShell => Label("_")
-                        case InputShell.ShellSet(shell) => Label(shell.toString)
-                      })
-                    case None => Nil
-                  })
-                case InputItemToSteal.BeerSet(item, input) =>
-                  Label("Beer") :: Label("and removed") :: List(input match {
-                    case InputShell.ChooseShell => Label("_")
-                    case InputShell.ShellSet(shell) => Label(shell.toString)
-                  })
-                case InputItemToSteal.BurnerPhoneSet(item, input) =>
-                  Label("Burner Phone") :: (input match {
-                    case Some(input) =>
-                      Label("and on spot") :: (input match {
-                        case InputSeqNr.ChooseSeqNr => List(Label("_"))
-                        case InputSeqNr.SeqNrSet(seqNr, input) =>
-                          Label(seqNr.toString) :: Label("revealed") :: List(input match {
-                            case InputShell.ChooseShell => Label("_")
-                            case InputShell.ShellSet(shell) => Label(shell.toString)
-                          })
-                      })
-                    case None => Nil
-                  })
-                case InputItemToSteal.MedsSet(item, input) =>
-                  Label("Meds") :: Label("and") :: List(input match {
-                    case InputMedsQuality.ChooseQuality => Label("_")
-                    case InputMedsQuality.QualitySet(good) => Label(if good then "healed" else "damaged")
-                  })
-              })
-          })
-      }),
+  private def shellSelect[State, E <: Event](description: Label)(builder: AccBuilder[State, Shell, E]) =
+    Select(
+      description = description.some,
+      options = Seq(LiveChoice, BlankChoice).map { choice =>
+        choice
+          .whenState[State]
+          .onClickReady(builder)
+      },
     )
+
+  private def magnifyingGlassShellSelect(stolen: Boolean) =
+    shellSelect[Unit, Event.PlayerUsed](description = Label("and revealed")) { (state, shell) =>
+      Event.PlayerUsed(FullItemUse.MagnifyingGlass(shell), stolen)
+    }
+
+  private def phoneShellSelect(stolen: Boolean) =
+    shellSelect[Position, Event.PlayerUsed](description = Label("as")) { (state, shell) =>
+      Event.PlayerUsed(FullItemUse.BurnerPhone((revealed = shell, at = state.at).some), stolen)
+    }
+
+  private def medsQualitySelect(stolen: Boolean) = Select[MedsQuality, Actor, Event.PlayerUsed | Event.DealerUsed](
+    description = Label("and they were").some,
+    options = Seq(GoodMedsChoice, BadMedsChoice).map { choice =>
+      choice
+        .whenState[Actor]
+        .onClickReady { (state, quality) =>
+          val good = quality == MedsQuality.Good
+          itemUseEvent(state, stolen)(
+            FullItemUse.Meds(good),
+            ItemUse.Meds(good),
+          )
+        }
+    },
+  )
+
+  private def beerShellSelect(stolen: Boolean) =
+    shellSelect[Actor, Event.PlayerUsed | Event.DealerUsed](description = Label("and revealed")) { (state, shell) =>
+      itemUseEvent(state, stolen)(
+        FullItemUse.Beer(shell),
+        ItemUse.Beer(shell),
+      )
+    }
+
+  private val TargetSelect = Select[Side, Actor, Event.DealerShot | Event.PlayerShot](
+    description = None,
+    options = Seq(PlayerChoice, DealerChoice).map { choice =>
+      choice
+        .whenState[Actor]
+        .onClickNext(ShotShellSelect)((state, target) => state ++ (target = target))
+    },
+  )
+
+  private def phonePositionSelect(shotgun: Shotgun, stolen: Boolean) =
+    Select[SeqNr | None.type, Unit, Event.PlayerUsed](
+      description = Label("and revealed").some,
+      options = {
+        val nothing =
+          NoShellChoice
+            .whenState[Unit]
+            .onClickReady[Event.PlayerUsed] { (_, nothing) =>
+              Event.PlayerUsed(FullItemUse.BurnerPhone(nothing), stolen)
+            }
+
+        val positions =
+          (shotgun.total minus Nat[1])
+            .map: available =>
+              Seq(Shell2Choice, Shell3Choice, Shell4Choice, Shell5Choice, Shell6Choice, Shell7Choice, Shell8Choice)
+                .take(available)
+            .getOrElse(Seq.empty)
+
+        nothing +: positions.map: choice =>
+          choice
+            .whenState[Unit]
+            .onClickNext(phoneShellSelect(stolen)) { (_, seqNr) =>
+              (at = seqNr)
+            }
+      },
+    )
+
+  private def stealItemSelect(opponentItems: Items, shotgun: Shotgun) =
+    Select[RegularItem, Actor, Event.PlayerUsed | Event.DealerUsed](
+      description = Label("to steal").some,
+      options = opponentItems.getRegular.toVector.sortBy(_.toString).map {
+        case Handcuffs =>
+          HandcuffsChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = true)(
+                FullItemUse.Handcuffs,
+                ItemUse.Handcuffs,
+              )
+            }
+        case MagnifyingGlass =>
+          MagnifyingGlassChoice
+            .whenState[Actor]
+            .onClick { state =>
+              state.actor match
+                case Player => Requires.next(magnifyingGlassShellSelect(stolen = true))(())
+                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = true))
+            }
+        case Beer =>
+          BeerChoice
+            .whenState[Actor]
+            .onClickNext(beerShellSelect(stolen = true))(keepState)
+        case Cigarettes =>
+          CigarettesChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = true)(
+                FullItemUse.Cigarettes,
+                ItemUse.Cigarettes,
+              )
+            }
+        case Saw =>
+          SawChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = true)(
+                FullItemUse.Saw,
+                ItemUse.Saw,
+              )
+            }
+        case Inverter =>
+          InverterChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = true)(
+                FullItemUse.Inverter,
+                ItemUse.Inverter,
+              )
+            }
+        case BurnerPhone =>
+          BurnerPhoneChoice
+            .whenState[Actor]
+            .onClick { state =>
+              state.actor match
+                case Player => Requires.next(phonePositionSelect(shotgun, stolen = true))(())
+                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = true))
+            }
+        case Meds =>
+          MedsChoice
+            .whenState[Actor]
+            .onClickNext(medsQualitySelect(stolen = true))(keepState)
+      },
+    )
+
+  private def itemSelect(actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
+    Select[Item, Actor, Event.PlayerUsed | Event.DealerUsed](
+      description = None,
+      options = actorItems.asSet.toVector.sortBy(_.toString).map {
+        case Adrenaline =>
+          AdrenalineChoice
+            .whenState[Actor]
+            .onClickNext(stealItemSelect(opponentItems, shotgun))(keepState)
+        case Handcuffs =>
+          HandcuffsChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = false)(
+                FullItemUse.Handcuffs,
+                ItemUse.Handcuffs,
+              )
+            }
+        case MagnifyingGlass =>
+          MagnifyingGlassChoice
+            .whenState[Actor]
+            .onClick { state =>
+              state.actor match
+                case Player => Requires.next(magnifyingGlassShellSelect(stolen = false))(())
+                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = false))
+            }
+        case Beer =>
+          BeerChoice
+            .whenState[Actor]
+            .onClickNext(beerShellSelect(stolen = false))(keepState)
+        case Cigarettes =>
+          CigarettesChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = false)(
+                FullItemUse.Cigarettes,
+                ItemUse.Cigarettes,
+              )
+            }
+        case Saw =>
+          SawChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = false)(
+                FullItemUse.Saw,
+                ItemUse.Saw,
+              )
+            }
+        case Inverter =>
+          InverterChoice
+            .whenState[Actor]
+            .onClickReady { (state, _) =>
+              itemUseEvent(state, stolen = false)(
+                FullItemUse.Inverter,
+                ItemUse.Inverter,
+              )
+            }
+        case BurnerPhone =>
+          BurnerPhoneChoice
+            .whenState[Actor]
+            .onClick { state =>
+              state.actor match
+                case Player => Requires.next(phonePositionSelect(shotgun, stolen = false))(())
+                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = false))
+            }
+        case Meds =>
+          MedsChoice
+            .whenState[Actor]
+            .onClickNext(medsQualitySelect(stolen = false))(keepState)
+      },
+    )
+
+  private def eventTypeSelect(actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
+    Select[EventType, Actor, Event](
+      description = None,
+      options = Seq(
+        ShotChoice
+          .whenState[Actor]
+          .onClickNext(TargetSelect)(keepState),
+        UsedChoice
+          .whenState[Actor]
+          .onClickNext(itemSelect(actorItems, opponentItems, shotgun))(keepState),
+      ),
+    )
+
+  private type Actor = (actor: Side)
+  private type Target = (target: Side)
+  private type Position = (at: SeqNr)
+
+  private infix type ++[A <: AnyNamedTuple, B <: AnyNamedTuple] = Concat[A, B]
+
+  private type ActorTarget = Actor ++ Target
+
+  private def itemUseEvent(state: Actor, stolen: Boolean)(
+    player: => FullItemUse,
+    dealer: => ItemUse,
+  ): Event.PlayerUsed | Event.DealerUsed =
+    state.actor match
+      case Player => Event.PlayerUsed(item = player, stolen = stolen)
+      case Dealer => Event.DealerUsed(item = dealer, stolen = stolen)
+
+  private def keepState[A]: AccBuilder[A, Any, A] = (state, _) => state
