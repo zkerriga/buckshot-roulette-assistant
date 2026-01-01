@@ -3,10 +3,10 @@ package com.zkerriga.buckshot.tui
 import com.googlecode.lanterna.gui2.*
 
 object InputButtonsComponent:
-  case class ChoiceElement[A](value: A, text: String, label: Label)
+  case class ChoiceElement[A](value: A, text: String, label: () => Label)
   object ChoiceElement:
     def of[A <: Singleton](value: A, text: String): ChoiceElement[A] =
-      ChoiceElement(value, text, Label(text))
+      ChoiceElement(value, text, () => Label(text))
 
     final class PartialChoice[A, Acc] private[ChoiceElement] (element: ChoiceElement[A]):
       def onClick[R](f: Acc => Requires[R]): Choice[A, Acc, R] =
@@ -33,7 +33,7 @@ object InputButtonsComponent:
   case class Choice[+A, Acc, +R](
     value: A,
     text: String,
-    label: Label,
+    label: () => Label,
     onClick: Acc => Requires[R],
   )
   object Choice:
@@ -45,11 +45,12 @@ object InputButtonsComponent:
     options: Seq[Choice[A, Acc, R]],
   )
 
-  case class Accumulated[Acc](value: Acc, labels: Seq[Label])
+  case class Accumulated[Acc](value: Acc, labels: () => Seq[Label])
 
   sealed trait InputState[R]
   object InputState:
-    case class ReadyToSubmit[R](undo: InputState[R], result: R) extends InputState[R]
+    case class ReadyToSubmit[A, Acc, R](undo: InputState.Choose[A, Acc, R], acc: Accumulated[Acc], result: R)
+        extends InputState[R]
     case class Choose[A, Acc, R](undo: Option[InputState[R]], acc: Accumulated[Acc], select: Select[A, Acc, R])
         extends InputState[R]
 
@@ -57,23 +58,23 @@ object InputButtonsComponent:
     def result(value: R): Unit
 
   def render[R](initial: InputState.Choose[?, ?, R], submit: Submit[R]): Component =
-    DynamicComponent.selfUpdatableOnly[InputState[R]](initial) { (input, update) =>
-      Panel(GridLayout(2))
-        .withAll(
-          Label("Command:"),
-          command(input),
-          EmptySpace(),
-          buttons(input, update, submit),
-        )
-        .withBorder(Borders.singleLine("Input"))
-    }
+    DynamicComponent
+      .selfUpdatableOnly[InputState[R]](initial) { (input, update) =>
+        Panel(GridLayout(2))
+          .withAll(
+            Label("Command:"),
+            command(input),
+            EmptySpace(),
+            buttons(input, update, submit),
+          )
+      }
+      .withBorder(Borders.singleLine("Input"))
 
   private def command[R](input: InputState[R]): Panel =
     Panel(LinearLayout(Direction.HORIZONTAL)).withSeq:
       input match
-        case InputState.ReadyToSubmit(_, _) => Seq.empty
-        case InputState.Choose(acc = accumulated) =>
-          accumulated.labels :+ Label("___")
+        case InputState.ReadyToSubmit(acc = accumulated) => accumulated.labels()
+        case InputState.Choose(acc = accumulated) => accumulated.labels() :+ Label("___")
 
   private def buttons[R](
     input: InputState[R],
@@ -81,12 +82,12 @@ object InputButtonsComponent:
     submit: Submit[R],
   ): Panel =
     input match
-      case InputState.ReadyToSubmit(undo, result) =>
+      case InputState.ReadyToSubmit(undo, _, result) =>
         Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
           submitButton(submit.result(result)),
           undoButton(components.update(undo)),
         )
-      case InputState.Choose(undo, acc, select) =>
+      case input @ InputState.Choose(undo, acc, select) =>
         def mainButtons: Panel =
           val totalChoices = select.options.size
           val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
@@ -100,12 +101,16 @@ object InputButtonsComponent:
                         undo = Some(input),
                         acc = Accumulated(
                           value = accValue,
-                          labels = acc.labels :+ choice.label :++ select.description,
+                          labels = () => acc.labels() :+ choice.label() :++ select.description,
                         ),
                         select = select,
                       )
                     case Requires.Ready(result) =>
-                      InputState.ReadyToSubmit(undo = input, result = result)
+                      InputState.ReadyToSubmit(
+                        undo = input,
+                        acc = acc.copy(labels = () => acc.labels() :+ choice.label()),
+                        result = result,
+                      )
                 }
               }
         undo match

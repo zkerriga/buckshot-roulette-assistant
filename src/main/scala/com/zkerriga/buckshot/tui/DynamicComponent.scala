@@ -19,7 +19,7 @@ object DynamicComponent extends Logging:
       case Nil => None
       case head :: next =>
         val headIsFocused = head match
-          case interactable: Interactable => Option.when(interactable.isFocusable)(interactable)
+          case interactable: Interactable => Option.when(interactable.isFocused)(interactable)
           case panel: Panel => searchFocused(panel.getChildren)
           case _ => None
         headIsFocused.orElse(searchFocused(next))

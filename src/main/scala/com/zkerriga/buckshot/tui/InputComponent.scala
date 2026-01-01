@@ -39,13 +39,13 @@ object InputComponent:
       if cannotUseAnyItem then
         InputState.Choose(
           undo = None,
-          acc = Accumulated((actor = game.turn), List(ShotChoice.label)),
+          acc = Accumulated((actor = game.turn), () => List(ShotChoice.label())),
           select = TargetSelect,
         )
       else
         InputState.Choose(
           undo = None,
-          acc = Accumulated((actor = game.turn), List()),
+          acc = Accumulated((actor = game.turn), () => List()),
           select = eventTypeSelect(
             actorItems = actorItems,
             opponentItems = opponentItems,
