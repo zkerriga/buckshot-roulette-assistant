@@ -9,19 +9,16 @@ object InputButtonsComponent:
       ChoiceElement(value, text, Label(text))
 
     final class PartialChoice[A, Acc] private[ChoiceElement] (element: ChoiceElement[A]):
-      def onClickFinalizeTo[R](using builder: AccBuilder[Acc, A, R]): Choice[A, Acc, R] =
+      def onClick[R](f: Acc => Requires[R]): Choice[A, Acc, R] =
+        Choice(element, f)
+      def onClickNext[B, Acc2, R](select: Select[B, Acc2, R])(builder: AccBuilder[Acc, A, Acc2]): Choice[A, Acc, R] =
+        Choice(element, acc => Requires.next(select)(builder.build(acc, element.value)))
+      def onClickReady[R](builder: AccBuilder[Acc, A, R]): Choice[A, Acc, R] =
         Choice(element, acc => Requires.Ready(builder.build(acc, element.value)))
-
-      def onClick[R](f: Acc => Requires[R]): Choice[A, Acc, R] = Choice(element, f)
-
-      def onClickContinueTo[B, Acc2, R](
-        select: Select[B, Acc2, R],
-      )(using builder: AccBuilder[Acc, A, Acc2]): Choice[A, Acc, R] =
-        Choice(element, acc => Requires.NextChoice(builder.build(acc, element.value), select))
 
     extension [A](element: ChoiceElement[A]) def whenState[Acc]: PartialChoice[A, Acc] = PartialChoice(element)
 
-  trait AccBuilder[Before, A, After]:
+  trait AccBuilder[Before, -A, After]:
     def build(before: Before, value: A): After
   object AccBuilder:
     given [A]: AccBuilder[Unit, A, A] = (_, value) => value
