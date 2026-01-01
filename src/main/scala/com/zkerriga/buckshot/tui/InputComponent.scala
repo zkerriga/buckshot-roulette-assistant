@@ -35,22 +35,24 @@ object InputComponent:
       actorItems.empty ||
         actorItems.asSet == Set(Adrenaline) && (opponentItems.empty || opponentItems.asSet == Set(Adrenaline))
 
-    val initial: InputState.Choose[?, Event] =
+    val initial: InputState[Event] =
       if cannotUseAnyItem then
-        InputState.Choose(
+        InputState(
           undo = None,
           acc = Accumulated(() => List(ShotChoice.label())),
-          select = targetSelect(game.turn),
+          next = Requires.NextChoice(targetSelect(game.turn)),
         )
       else
-        InputState.Choose(
+        InputState(
           undo = None,
           acc = Accumulated(() => List()),
-          select = eventTypeSelect(
-            actor = game.turn,
-            actorItems = actorItems,
-            opponentItems = opponentItems,
-            shotgun = game.shotgun,
+          next = Requires.NextChoice(
+            eventTypeSelect(
+              actor = game.turn,
+              actorItems = actorItems,
+              opponentItems = opponentItems,
+              shotgun = game.shotgun,
+            ),
           ),
         )
     InputButtonsComponent.render(initial, result => submit.event(result))
@@ -190,7 +192,7 @@ object InputComponent:
           MagnifyingGlassChoice
             .onClick { () =>
               actor match
-                case Player => Requires.next(magnifyingGlassShellSelect(stolen = true))
+                case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = true))
                 case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = true))
             }
         case Beer =>
@@ -224,7 +226,7 @@ object InputComponent:
           BurnerPhoneChoice
             .onClick { () =>
               actor match
-                case Player => Requires.next(phonePositionSelect(shotgun, stolen = true))
+                case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = true))
                 case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = true))
             }
         case Meds =>
@@ -252,7 +254,7 @@ object InputComponent:
           MagnifyingGlassChoice
             .onClick { () =>
               actor match
-                case Player => Requires.next(magnifyingGlassShellSelect(stolen = false))
+                case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = false))
                 case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = false))
             }
         case Beer =>
@@ -286,7 +288,7 @@ object InputComponent:
           BurnerPhoneChoice
             .onClick { () =>
               actor match
-                case Player => Requires.next(phonePositionSelect(shotgun, stolen = false))
+                case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = false))
                 case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = false))
             }
         case Meds =>

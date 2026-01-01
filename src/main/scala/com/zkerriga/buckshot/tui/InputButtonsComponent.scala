@@ -12,7 +12,7 @@ object InputButtonsComponent:
       def onClick[R](f: () => Requires[R]): Choice[A, R] =
         Choice(element, f)
       def onClickNext[B, R](select: Select[B, R]): Choice[A, R] =
-        Choice(element, () => Requires.next(select))
+        Choice(element, () => Requires.NextChoice(select))
       def onClickReady[R](build: A => R): Choice[A, R] =
         Choice(element, () => Requires.Ready(build(element.value)))
     }
@@ -21,8 +21,6 @@ object InputButtonsComponent:
   object Requires:
     case class NextChoice[A, R](select: Select[A, R]) extends Requires[R]
     case class Ready[R](result: R) extends Requires[R]
-
-    def next[A, R](select: Select[A, R]): NextChoice[A, R] = NextChoice(select)
 
   case class Choice[+A, +R](
     value: A,
@@ -40,16 +38,12 @@ object InputButtonsComponent:
   )
 
   case class Accumulated(labels: () => Seq[Label])
-
-  sealed trait InputState[R]
-  object InputState:
-    case class ReadyToSubmit[A, R](undo: InputState.Choose[A, R], acc: Accumulated, result: R) extends InputState[R]
-    case class Choose[A, R](undo: Option[InputState[R]], acc: Accumulated, select: Select[A, R]) extends InputState[R]
+  case class InputState[R](undo: Option[InputState[R]], acc: Accumulated, next: Requires[R])
 
   trait Submit[R]:
     def result(value: R): Unit
 
-  def render[R](initial: InputState.Choose[?, R], submit: Submit[R]): Component =
+  def render[R](initial: InputState[R], submit: Submit[R]): Component =
     DynamicComponent
       .selfUpdatableOnly[InputState[R]](initial) { (input, update) =>
         Panel(GridLayout(2))
@@ -64,22 +58,26 @@ object InputButtonsComponent:
 
   private def command[R](input: InputState[R]): Panel =
     Panel(LinearLayout(Direction.HORIZONTAL)).withSeq:
-      input match
-        case InputState.ReadyToSubmit(acc = accumulated) => accumulated.labels()
-        case InputState.Choose(acc = accumulated) => accumulated.labels() :+ Label("___")
+      input.acc.labels() ++ (input.next match {
+        case Requires.NextChoice(select) => select.description.toSeq :+ Label("___")
+        case Requires.Ready(_) => List.empty
+      })
 
   private def buttons[R](
     input: InputState[R],
     components: DynamicComponent.Update[InputState[R]],
     submit: Submit[R],
   ): Panel =
-    input match
-      case InputState.ReadyToSubmit(undo, _, result) =>
+    val undoButtonComponent: Component =
+      input.undo.fold(Panel()): previous =>
+        undoButton(components.update(previous))
+    input.next match
+      case Requires.Ready(result) =>
         Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
           submitButton(submit.result(result)),
-          undoButton(components.update(undo)),
+          undoButtonComponent,
         )
-      case input @ InputState.Choose(undo, acc, select) =>
+      case Requires.NextChoice(select) =>
         def mainButtons: Panel =
           val totalChoices = select.options.size
           val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
@@ -87,30 +85,17 @@ object InputButtonsComponent:
             select.options.map: choice =>
               button(choice.text) {
                 components.update {
-                  choice.onClick() match
-                    case Requires.NextChoice(select) =>
-                      InputState.Choose(
-                        undo = Some(input),
-                        acc = Accumulated(
-                          labels = () => acc.labels() :+ choice.label() :++ select.description,
-                        ),
-                        select = select,
-                      )
-                    case Requires.Ready(result) =>
-                      InputState.ReadyToSubmit(
-                        undo = input,
-                        acc = Accumulated(labels = () => acc.labels() :+ choice.label()),
-                        result = result,
-                      )
+                  InputState(
+                    undo = Some(input),
+                    acc = Accumulated(labels = () => input.acc.labels() :++ select.description :+ choice.label()),
+                    next = choice.onClick(),
+                  )
                 }
               }
-        undo match
-          case Some(undoState) =>
-            Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-              mainButtons,
-              undoButton(components.update(undoState)),
-            )
-          case None => mainButtons
+        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+          mainButtons,
+          undoButtonComponent,
+        )
 
   private def undoButton(onClick: => Unit): Button =
     button("| undo |")(onClick)
