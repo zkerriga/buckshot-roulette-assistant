@@ -1,16 +1,15 @@
 package com.zkerriga.buckshot.tui
 
 import cats.syntax.all.*
-import com.googlecode.lanterna.gui2.{Component, Label}
+import com.googlecode.lanterna.TextColor.ANSI
+import com.googlecode.lanterna.gui2.Component
 import com.zkerriga.buckshot.engine.events.PlayerUsed.ItemUse as FullItemUse
 import com.zkerriga.buckshot.game.accessors.Opposition
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used.ItemUse
 import com.zkerriga.buckshot.game.state.items.Item
-import com.zkerriga.buckshot.tui.InputButtonsComponent.SelectPrefix.EmptySelectPrefix
 import com.zkerriga.types.Nat
-
-import scala.NamedTuple.{AnyNamedTuple, Concat}
+import com.zkerriga.types.Opt.syntax.given
 
 object InputComponent:
   enum Event:
@@ -40,7 +39,7 @@ object InputComponent:
       if cannotUseAnyItem then
         InputState(
           undo = None,
-          acc = Accumulated(Seq(EmptySelectPrefix -> ShotChoice)),
+          acc = Accumulated(Seq(SelectPrefix() -> ShotChoice)),
           next = Requires.NextChoice(targetSelect(game.turn)),
         )
       else
@@ -59,36 +58,33 @@ object InputComponent:
     InputButtonsComponent.render(initial, result => submit.event(result))
   }
 
-  private val LiveChoice = ChoiceElement.of(Live, "Live")
-  private val BlankChoice = ChoiceElement.of(Blank, "Blank")
+  private val LiveChoice = ChoiceElement.of(Live, "Live", back = ANSI.RED)
+  private val BlankChoice = ChoiceElement.of(Blank, "Blank", back = ANSI.BLUE)
 
-  private val PlayerChoice = ChoiceElement.of(Player, "Player")
-  private val DealerChoice = ChoiceElement.of(Dealer, "Dealer")
+  private val PlayerChoice = ChoiceElement.of(Player, "Player", front = ANSI.MAGENTA)
+  private val DealerChoice = ChoiceElement.of(Dealer, "Dealer", front = ANSI.MAGENTA)
 
   private enum EventType:
     case Shot, Used
 
-  private type Shot = EventType.Shot.type
-  private type Used = EventType.Used.type
-
   private val ShotChoice = ChoiceElement.of(EventType.Shot, "shot")
   private val UsedChoice = ChoiceElement.of(EventType.Used, "used")
 
-  private val AdrenalineChoice = ChoiceElement.of(Adrenaline, "Adrenaline")
-  private val HandcuffsChoice = ChoiceElement.of(Handcuffs, "Handcuffs")
-  private val MagnifyingGlassChoice = ChoiceElement.of(MagnifyingGlass, "Magnifying Glass")
-  private val BeerChoice = ChoiceElement.of(Beer, "Beer")
-  private val CigarettesChoice = ChoiceElement.of(Cigarettes, "Cigarettes")
-  private val SawChoice = ChoiceElement.of(Saw, "Saw")
-  private val InverterChoice = ChoiceElement.of(Inverter, "Inverter")
-  private val BurnerPhoneChoice = ChoiceElement.of(BurnerPhone, "Burner Phone")
-  private val MedsChoice = ChoiceElement.of(Meds, "Meds")
+  private val AdrenalineChoice = ChoiceElement.of(Adrenaline, "Adrenaline", front = ANSI.GREEN)
+  private val HandcuffsChoice = ChoiceElement.of(Handcuffs, "Handcuffs", front = ANSI.YELLOW)
+  private val MagnifyingGlassChoice = ChoiceElement.of(MagnifyingGlass, "Magnifying Glass", front = ANSI.YELLOW)
+  private val BeerChoice = ChoiceElement.of(Beer, "Beer", front = ANSI.YELLOW)
+  private val CigarettesChoice = ChoiceElement.of(Cigarettes, "Cigarettes", front = ANSI.YELLOW)
+  private val SawChoice = ChoiceElement.of(Saw, "Saw", front = ANSI.YELLOW)
+  private val InverterChoice = ChoiceElement.of(Inverter, "Inverter", front = ANSI.YELLOW)
+  private val BurnerPhoneChoice = ChoiceElement.of(BurnerPhone, "Burner Phone", front = ANSI.YELLOW)
+  private val MedsChoice = ChoiceElement.of(Meds, "Meds", front = ANSI.YELLOW)
 
   private enum MedsQuality:
     case Good, Bad
 
-  private val GoodMedsChoice = ChoiceElement.of(MedsQuality.Good, "Good")
-  private val BadMedsChoice = ChoiceElement.of(MedsQuality.Bad, "Bad")
+  private val GoodMedsChoice = ChoiceElement.of(MedsQuality.Good, "Good", front = ANSI.CYAN)
+  private val BadMedsChoice = ChoiceElement.of(MedsQuality.Bad, "Bad", front = ANSI.CYAN)
 
   private val NoShellChoice = ChoiceElement.of(None, "nothing")
   private val Shell2Choice = ChoiceElement.of(Shell2, "2d shell")
@@ -146,7 +142,7 @@ object InputComponent:
       }
 
   private def targetSelect(actor: Side) =
-    EmptySelectPrefix.withOptions[Side, Event.DealerShot | Event.PlayerShot]:
+    SelectPrefix().withOptions[Side, Event.DealerShot | Event.PlayerShot]:
       Seq(PlayerChoice, DealerChoice).map { choice =>
         choice.onClickNext(shotShellSelect(actor, choice.value))
       }
@@ -154,10 +150,9 @@ object InputComponent:
   private def phonePositionSelect(shotgun: Shotgun, stolen: Boolean) =
     SelectPrefix("and revealed").withOptions[SeqNr | None.type, Event.PlayerUsed] {
       val nothing =
-        NoShellChoice
-          .onClickReady[Event.PlayerUsed] { nothing =>
-            Event.PlayerUsed(FullItemUse.BurnerPhone(nothing), stolen)
-          }
+        NoShellChoice.onClickReady[Event.PlayerUsed] { nothing =>
+          Event.PlayerUsed(FullItemUse.BurnerPhone(nothing), stolen)
+        }
 
       val positions =
         (shotgun.total minus Nat[1])
@@ -167,8 +162,7 @@ object InputComponent:
           .getOrElse(Seq.empty)
 
       nothing +: positions.map: choice =>
-        choice
-          .onClickNext(phoneShellSelect(choice.value, stolen))
+        choice.onClickNext(phoneShellSelect(choice.value, stolen))
     }
 
   private def stealItemSelect(actor: Side, opponentItems: Items, shotgun: Shotgun) =
@@ -221,7 +215,7 @@ object InputComponent:
       }
 
   private def itemSelect(actor: Side, actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
-    EmptySelectPrefix.withOptions[Item, Event.PlayerUsed | Event.DealerUsed]:
+    SelectPrefix().withOptions[Item, Event.PlayerUsed | Event.DealerUsed]:
       actorItems.asSet.toVector.sortBy(_.toString).map {
         case Adrenaline =>
           AdrenalineChoice.onClickNext(stealItemSelect(actor, opponentItems, shotgun))
@@ -272,7 +266,7 @@ object InputComponent:
       }
 
   private def eventTypeSelect(actor: Side, actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
-    EmptySelectPrefix.withOptions:
+    SelectPrefix().withOptions:
       Seq(
         ShotChoice.onClickNext(targetSelect(actor)),
         UsedChoice.onClickNext(itemSelect(actor, actorItems, opponentItems, shotgun)),

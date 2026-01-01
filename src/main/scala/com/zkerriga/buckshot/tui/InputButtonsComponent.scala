@@ -4,53 +4,53 @@ import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
 
 object InputButtonsComponent:
-  case class ChoiceElement[+A](value: A, text: String, color: Option[TextColor.ANSI])
+  case class ChoiceElement[+A](
+    value: A,
+    text: String,
+    front: Option[TextColor.ANSI],
+    back: Option[TextColor.ANSI],
+  )
   object ChoiceElement:
-    def of[A <: Singleton](value: A, text: String): ChoiceElement[A] =
-      ChoiceElement(value, text, None)
+    def of[A <: Singleton](
+      value: A,
+      text: String,
+      front: Option[TextColor.ANSI] = None,
+      back: Option[TextColor.ANSI] = None,
+    ): ChoiceElement[A] =
+      ChoiceElement(value, text, front = front, back = back)
 
-    extension [A](choice: ChoiceElement[A]) {
+    extension [A](choice: ChoiceElement[A])
+      def onClick[R](requires: Requires[R]): Choice[A, R] = Choice(choice, requires)
+      def onClickNext[B, R](select: Select[B, R]): Choice[A, R] = Choice(choice, Requires.NextChoice(select))
+      def onClickReady[R](build: A => R): Choice[A, R] = Choice(choice, Requires.Ready(build(choice.value)))
       private[InputButtonsComponent] def label: Label =
         val base = Label(choice.text)
-        choice.color.fold(base): color =>
-          base.setForegroundColor(color)
-
-      def withColor(color: TextColor.ANSI): ChoiceElement[A] =
-        choice.copy(color = Some(color))
-
-      def onClick[R](requires: Requires[R]): Choice[A, R] =
-        Choice(choice, requires)
-
-      def onClickNext[B, R](select: Select[B, R]): Choice[A, R] =
-        Choice(choice, Requires.NextChoice(select))
-      def onClickReady[R](build: A => R): Choice[A, R] =
-        Choice(choice, Requires.Ready(build(choice.value)))
-    }
+        choice.front.foreach(base.setForegroundColor)
+        choice.back.foreach(base.setBackgroundColor)
+        base
 
   case class Choice[+A, +R](element: ChoiceElement[A], onClick: Requires[R])
 
-  case class SelectPrefix(text: Option[String])
+  case class SelectPrefix(text: Option[String] = None)
   object SelectPrefix:
-    val EmptySelectPrefix: SelectPrefix = SelectPrefix(None)
-    def apply(text: String): SelectPrefix = SelectPrefix(Some(text))
-
     extension (prefix: SelectPrefix)
+      def withOptions[A, R](options: Seq[Choice[A, R]]): Select[A, R] = Select(prefix, options)
       private[InputButtonsComponent] def label: Option[Label] =
         prefix.text.map(Label(_))
-
-      def withOptions[A, R](options: Seq[Choice[A, R]]): Select[A, R] = Select(prefix, options)
 
   sealed trait Requires[+R]
   object Requires:
     case class NextChoice[A, R](select: Select[A, R]) extends Requires[R]
     case class Ready[R](result: R) extends Requires[R]
 
-  case class Accumulated(passed: Seq[(SelectPrefix, ChoiceElement[Any])]):
-    def add(select: SelectPrefix, choice: ChoiceElement[Any]): Accumulated =
-      Accumulated(passed :+ (select -> choice))
-    private[InputButtonsComponent] def labels: Seq[Label] =
-      passed.flatMap: (select, choice) =>
-        select.label.toSeq :+ choice.label
+  case class Accumulated(passed: Seq[(SelectPrefix, ChoiceElement[?])])
+  object Accumulated:
+    extension (acc: Accumulated)
+      def add(select: SelectPrefix, choice: ChoiceElement[?]): Accumulated =
+        Accumulated(acc.passed :+ (select -> choice))
+      private[InputButtonsComponent] def labels: Seq[Label] =
+        acc.passed.flatMap: (select, choice) =>
+          select.label.toSeq :+ choice.label
 
   case class Select[A, +R](prefix: SelectPrefix, options: Seq[Choice[A, R]])
   case class InputState[R](undo: Option[InputState[R]], acc: Accumulated, next: Requires[R])

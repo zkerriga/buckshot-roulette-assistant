@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
 
 object AppLog:
   private val instance: IzLogger = IzLogger(
-    threshold = Log.Level.Trace,
+    threshold = Log.Level.Debug,
     sink = new FileSink[RealFile](
       renderingPolicy = RenderingPolicy.colorlessPolicy(
         Some(
