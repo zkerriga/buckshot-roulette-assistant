@@ -22,7 +22,7 @@ object PlayerUsed:
     case Cigarettes
     case Saw
     case Inverter
-    case BurnerPhone(revealed: Shell, at: SeqNr)
+    case BurnerPhone(revealed: Option[(revealed: Shell, at: SeqNr)])
     case Meds(good: Boolean)
 
   def execute(state: GameState, used: PlayerUsed): V[GameOver | Reset | GameState] =
@@ -43,7 +43,9 @@ object PlayerUsed:
   private def updatePlayerKnowledge(knowledge: Revealed, item: ItemUse): Revealed =
     item match
       case ItemUse.MagnifyingGlass(revealed) => knowledge.revealed(revealed, Shell1)
-      case ItemUse.BurnerPhone(revealed, at) => knowledge.revealed(revealed, at)
+      case ItemUse.BurnerPhone(revealed) =>
+        revealed.fold(knowledge): (revealed, at) =>
+          knowledge.revealed(revealed, at)
       case ItemUse.Beer(out) => knowledge.afterShellOut
       case _ => knowledge
 
@@ -57,9 +59,10 @@ object PlayerUsed:
         belief.conditioning: knowledge =>
           Chance.certainUnless(missOnGlassReveal(knowledge, table.shotgun, revealed))
 
-      case ItemUse.BurnerPhone(revealed, at) =>
-        belief.conditioning: knowledge =>
-          Chance.certainUnless(missOnPhoneReveal(knowledge, table.shotgun, revealed, at))
+      case ItemUse.BurnerPhone(revealed) =>
+        revealed.fold(belief.ok): (revealed, at) =>
+          belief.conditioning: knowledge =>
+            Chance.certainUnless(missOnPhoneReveal(knowledge, table.shotgun, revealed, at))
 
       case ItemUse.Beer(out) =>
         for adjusted <- belief.conditioning: knowledge =>
@@ -71,10 +74,10 @@ object PlayerUsed:
   object ItemUse:
     private[PlayerUsed] val asPublic: ItemUse => Used.ItemUse =
       case ItemUse.Handcuffs => Used.ItemUse.Handcuffs
-      case ItemUse.MagnifyingGlass(revealed) => Used.ItemUse.MagnifyingGlass
+      case ItemUse.MagnifyingGlass(_) => Used.ItemUse.MagnifyingGlass
       case ItemUse.Beer(out) => Used.ItemUse.Beer(out)
       case ItemUse.Cigarettes => Used.ItemUse.Cigarettes
       case ItemUse.Saw => Used.ItemUse.Saw
       case ItemUse.Inverter => Used.ItemUse.Inverter
-      case ItemUse.BurnerPhone(revealed, at) => Used.ItemUse.BurnerPhone
+      case ItemUse.BurnerPhone(_) => Used.ItemUse.BurnerPhone
       case ItemUse.Meds(good) => Used.ItemUse.Meds(good)
