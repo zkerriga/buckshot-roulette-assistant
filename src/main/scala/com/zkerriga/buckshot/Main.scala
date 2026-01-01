@@ -4,7 +4,7 @@ import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
 import com.zkerriga.buckshot.engine.Engine
 import com.zkerriga.buckshot.journal.AppLog.Logging
-import com.zkerriga.buckshot.tui.{ColorScheme, GameWindow, SetupWindow}
+import com.zkerriga.buckshot.tui.{ColorScheme, Dialogs, GameWindow, SetupWindow}
 import com.zkerriga.types.Ref
 
 object Main extends Logging:
@@ -31,7 +31,7 @@ object Main extends Logging:
         case None => () // quit
         case Some(engine) =>
           log.trace("starting game window")
-          val gameWindow = GameWindow.window(engine)
+          val gameWindow = GameWindow.window(Dialogs(textGUI), engine)
           textGUI.addWindowAndWait(gameWindow)
           log.trace("game window closed")
     } catch {
