@@ -1,43 +1,58 @@
 package com.zkerriga.buckshot.tui
 
+import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
 
 object InputButtonsComponent:
-  case class ChoiceElement[A](value: A, text: String, label: () => Label)
+  case class ChoiceElement[+A](value: A, text: String, color: Option[TextColor.ANSI])
   object ChoiceElement:
     def of[A <: Singleton](value: A, text: String): ChoiceElement[A] =
-      ChoiceElement(value, text, () => Label(text))
+      ChoiceElement(value, text, None)
 
-    extension [A](element: ChoiceElement[A]) {
-      def onClick[R](f: () => Requires[R]): Choice[A, R] =
-        Choice(element, f)
+    extension [A](choice: ChoiceElement[A]) {
+      private[InputButtonsComponent] def label: Label =
+        val base = Label(choice.text)
+        choice.color.fold(base): color =>
+          base.setForegroundColor(color)
+
+      def withColor(color: TextColor.ANSI): ChoiceElement[A] =
+        choice.copy(color = Some(color))
+
+      def onClick[R](requires: Requires[R]): Choice[A, R] =
+        Choice(choice, requires)
+
       def onClickNext[B, R](select: Select[B, R]): Choice[A, R] =
-        Choice(element, () => Requires.NextChoice(select))
+        Choice(choice, Requires.NextChoice(select))
       def onClickReady[R](build: A => R): Choice[A, R] =
-        Choice(element, () => Requires.Ready(build(element.value)))
+        Choice(choice, Requires.Ready(build(choice.value)))
     }
+
+  case class Choice[+A, +R](element: ChoiceElement[A], onClick: Requires[R])
+
+  case class SelectPrefix(text: Option[String])
+  object SelectPrefix:
+    val EmptySelectPrefix: SelectPrefix = SelectPrefix(None)
+    def apply(text: String): SelectPrefix = SelectPrefix(Some(text))
+
+    extension (prefix: SelectPrefix)
+      private[InputButtonsComponent] def label: Option[Label] =
+        prefix.text.map(Label(_))
+
+      def withOptions[A, R](options: Seq[Choice[A, R]]): Select[A, R] = Select(prefix, options)
 
   sealed trait Requires[+R]
   object Requires:
     case class NextChoice[A, R](select: Select[A, R]) extends Requires[R]
     case class Ready[R](result: R) extends Requires[R]
 
-  case class Choice[+A, +R](
-    value: A,
-    text: String,
-    label: () => Label,
-    onClick: () => Requires[R],
-  )
-  object Choice:
-    def apply[A, R](element: ChoiceElement[A], onClick: () => Requires[R]): Choice[A, R] =
-      Choice(element.value, element.text, element.label, onClick)
+  case class Accumulated(passed: Seq[(SelectPrefix, ChoiceElement[Any])]):
+    def add(select: SelectPrefix, choice: ChoiceElement[Any]): Accumulated =
+      Accumulated(passed :+ (select -> choice))
+    private[InputButtonsComponent] def labels: Seq[Label] =
+      passed.flatMap: (select, choice) =>
+        select.label.toSeq :+ choice.label
 
-  case class Select[A, +R](
-    description: Option[Label],
-    options: Seq[Choice[A, R]],
-  )
-
-  case class Accumulated(labels: () => Seq[Label])
+  case class Select[A, +R](prefix: SelectPrefix, options: Seq[Choice[A, R]])
   case class InputState[R](undo: Option[InputState[R]], acc: Accumulated, next: Requires[R])
 
   trait Submit[R]:
@@ -58,8 +73,8 @@ object InputButtonsComponent:
 
   private def command[R](input: InputState[R]): Panel =
     Panel(LinearLayout(Direction.HORIZONTAL)).withSeq:
-      input.acc.labels() ++ (input.next match {
-        case Requires.NextChoice(select) => select.description.toSeq :+ Label("___")
+      input.acc.labels ++ (input.next match {
+        case Requires.NextChoice(select) => select.prefix.label.toSeq :+ Label("___")
         case Requires.Ready(_) => List.empty
       })
 
@@ -83,12 +98,12 @@ object InputButtonsComponent:
           val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
           Panel(GridLayout(bestGridColumns)).withSeq:
             select.options.map: choice =>
-              button(choice.text) {
+              button(choice.element.text) {
                 components.update {
                   InputState(
                     undo = Some(input),
-                    acc = Accumulated(labels = () => input.acc.labels() :++ select.description :+ choice.label()),
-                    next = choice.onClick(),
+                    acc = input.acc.add(select.prefix, choice.element),
+                    next = choice.onClick,
                   )
                 }
               }

@@ -7,6 +7,7 @@ import com.zkerriga.buckshot.game.accessors.Opposition
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used.ItemUse
 import com.zkerriga.buckshot.game.state.items.Item
+import com.zkerriga.buckshot.tui.InputButtonsComponent.SelectPrefix.EmptySelectPrefix
 import com.zkerriga.types.Nat
 
 import scala.NamedTuple.{AnyNamedTuple, Concat}
@@ -39,13 +40,13 @@ object InputComponent:
       if cannotUseAnyItem then
         InputState(
           undo = None,
-          acc = Accumulated(() => List(ShotChoice.label())),
+          acc = Accumulated(Seq(EmptySelectPrefix -> ShotChoice)),
           next = Requires.NextChoice(targetSelect(game.turn)),
         )
       else
         InputState(
           undo = None,
-          acc = Accumulated(() => List()),
+          acc = Accumulated(Seq.empty),
           next = Requires.NextChoice(
             eventTypeSelect(
               actor = game.turn,
@@ -99,214 +100,183 @@ object InputComponent:
   private val Shell8Choice = ChoiceElement.of(Shell8, "8th shell")
 
   private def shotShellSelect(actor: Side, target: Side) =
-    shellSelect[Event.DealerShot | Event.PlayerShot](description = Label("with")) { shell =>
-      actor match
-        case Player => Event.PlayerShot(target = target, shell = shell)
-        case Dealer => Event.DealerShot(target = target, shell = shell)
-    }
+    SelectPrefix("with").withOptions:
+      shellChoice[Event.DealerShot | Event.PlayerShot] { shell =>
+        actor match
+          case Player => Event.PlayerShot(target = target, shell = shell)
+          case Dealer => Event.DealerShot(target = target, shell = shell)
+      }
 
-  private def shellSelect[E <: Event](description: Label)(builder: Shell => E) =
-    Select(
-      description = description.some,
-      options = Seq(LiveChoice, BlankChoice).map { choice =>
-        choice.onClickReady(builder)
-      },
-    )
+  private def shellChoice[E <: Event](builder: Shell => E) =
+    Seq(LiveChoice, BlankChoice).map { choice =>
+      choice.onClickReady(builder)
+    }
 
   private def magnifyingGlassShellSelect(stolen: Boolean) =
-    shellSelect[Event.PlayerUsed](description = Label("and revealed")) { shell =>
-      Event.PlayerUsed(FullItemUse.MagnifyingGlass(shell), stolen)
-    }
+    SelectPrefix("and revealed").withOptions:
+      shellChoice[Event.PlayerUsed] { shell =>
+        Event.PlayerUsed(FullItemUse.MagnifyingGlass(shell), stolen)
+      }
 
   private def phoneShellSelect(at: SeqNr, stolen: Boolean) =
-    shellSelect[Event.PlayerUsed](description = Label("as")) { shell =>
-      Event.PlayerUsed(FullItemUse.BurnerPhone((revealed = shell, at = at).some), stolen)
-    }
+    SelectPrefix("as").withOptions:
+      shellChoice[Event.PlayerUsed] { shell =>
+        Event.PlayerUsed(FullItemUse.BurnerPhone((revealed = shell, at = at).some), stolen)
+      }
 
   private def medsQualitySelect(actor: Side, stolen: Boolean) =
-    Select[MedsQuality, Event.PlayerUsed | Event.DealerUsed](
-      description = Label("and they were").some,
-      options = Seq(GoodMedsChoice, BadMedsChoice).map { choice =>
-        choice
-          .onClickReady { quality =>
-            val good = quality == MedsQuality.Good
-            itemUseEvent(actor, stolen)(
-              FullItemUse.Meds(good),
-              ItemUse.Meds(good),
-            )
-          }
-      },
-    )
+    SelectPrefix("and they were").withOptions[MedsQuality, Event.PlayerUsed | Event.DealerUsed]:
+      Seq(GoodMedsChoice, BadMedsChoice).map { choice =>
+        choice.onClickReady { quality =>
+          val good = quality == MedsQuality.Good
+          itemUseEvent(actor, stolen)(
+            FullItemUse.Meds(good),
+            ItemUse.Meds(good),
+          )
+        }
+      }
 
   private def beerShellSelect(actor: Side, stolen: Boolean) =
-    shellSelect[Event.PlayerUsed | Event.DealerUsed](description = Label("and revealed")) { shell =>
-      itemUseEvent(actor, stolen)(
-        FullItemUse.Beer(shell),
-        ItemUse.Beer(shell),
-      )
-    }
+    SelectPrefix("and revealed").withOptions:
+      shellChoice[Event.PlayerUsed | Event.DealerUsed] { shell =>
+        itemUseEvent(actor, stolen)(
+          FullItemUse.Beer(shell),
+          ItemUse.Beer(shell),
+        )
+      }
 
-  private def targetSelect(actor: Side) = Select[Side, Event.DealerShot | Event.PlayerShot](
-    description = None,
-    options = Seq(PlayerChoice, DealerChoice).map { choice =>
-      choice.onClickNext(shotShellSelect(actor, choice.value))
-    },
-  )
+  private def targetSelect(actor: Side) =
+    EmptySelectPrefix.withOptions[Side, Event.DealerShot | Event.PlayerShot]:
+      Seq(PlayerChoice, DealerChoice).map { choice =>
+        choice.onClickNext(shotShellSelect(actor, choice.value))
+      }
 
   private def phonePositionSelect(shotgun: Shotgun, stolen: Boolean) =
-    Select[SeqNr | None.type, Event.PlayerUsed](
-      description = Label("and revealed").some,
-      options = {
-        val nothing =
-          NoShellChoice
-            .onClickReady[Event.PlayerUsed] { nothing =>
-              Event.PlayerUsed(FullItemUse.BurnerPhone(nothing), stolen)
-            }
+    SelectPrefix("and revealed").withOptions[SeqNr | None.type, Event.PlayerUsed] {
+      val nothing =
+        NoShellChoice
+          .onClickReady[Event.PlayerUsed] { nothing =>
+            Event.PlayerUsed(FullItemUse.BurnerPhone(nothing), stolen)
+          }
 
-        val positions =
-          (shotgun.total minus Nat[1])
-            .map: available =>
-              Seq(Shell2Choice, Shell3Choice, Shell4Choice, Shell5Choice, Shell6Choice, Shell7Choice, Shell8Choice)
-                .take(available)
-            .getOrElse(Seq.empty)
+      val positions =
+        (shotgun.total minus Nat[1])
+          .map: available =>
+            Seq(Shell2Choice, Shell3Choice, Shell4Choice, Shell5Choice, Shell6Choice, Shell7Choice, Shell8Choice)
+              .take(available)
+          .getOrElse(Seq.empty)
 
-        nothing +: positions.map: choice =>
-          choice
-            .onClickNext(phoneShellSelect(choice.value, stolen))
-      },
-    )
+      nothing +: positions.map: choice =>
+        choice
+          .onClickNext(phoneShellSelect(choice.value, stolen))
+    }
 
   private def stealItemSelect(actor: Side, opponentItems: Items, shotgun: Shotgun) =
-    Select[RegularItem, Event.PlayerUsed | Event.DealerUsed](
-      description = Label("to steal").some,
-      options = opponentItems.getRegular.toVector.sortBy(_.toString).map {
+    SelectPrefix("to steal").withOptions[RegularItem, Event.PlayerUsed | Event.DealerUsed]:
+      opponentItems.getRegular.toVector.sortBy(_.toString).map {
         case Handcuffs =>
-          HandcuffsChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = true)(
-                FullItemUse.Handcuffs,
-                ItemUse.Handcuffs,
-              )
-            }
+          HandcuffsChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = true)(
+              FullItemUse.Handcuffs,
+              ItemUse.Handcuffs,
+            )
+          }
         case MagnifyingGlass =>
-          MagnifyingGlassChoice
-            .onClick { () =>
-              actor match
-                case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = true))
-                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = true))
-            }
+          MagnifyingGlassChoice.onClick {
+            actor match
+              case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = true))
+              case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = true))
+          }
         case Beer =>
-          BeerChoice
-            .onClickNext(beerShellSelect(actor, stolen = true))
+          BeerChoice.onClickNext(beerShellSelect(actor, stolen = true))
         case Cigarettes =>
-          CigarettesChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = true)(
-                FullItemUse.Cigarettes,
-                ItemUse.Cigarettes,
-              )
-            }
+          CigarettesChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = true)(
+              FullItemUse.Cigarettes,
+              ItemUse.Cigarettes,
+            )
+          }
         case Saw =>
-          SawChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = true)(
-                FullItemUse.Saw,
-                ItemUse.Saw,
-              )
-            }
+          SawChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = true)(
+              FullItemUse.Saw,
+              ItemUse.Saw,
+            )
+          }
         case Inverter =>
-          InverterChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = true)(
-                FullItemUse.Inverter,
-                ItemUse.Inverter,
-              )
-            }
+          InverterChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = true)(
+              FullItemUse.Inverter,
+              ItemUse.Inverter,
+            )
+          }
         case BurnerPhone =>
-          BurnerPhoneChoice
-            .onClick { () =>
-              actor match
-                case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = true))
-                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = true))
-            }
+          BurnerPhoneChoice.onClick {
+            actor match
+              case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = true))
+              case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = true))
+          }
         case Meds =>
-          MedsChoice
-            .onClickNext(medsQualitySelect(actor, stolen = true))
-      },
-    )
+          MedsChoice.onClickNext(medsQualitySelect(actor, stolen = true))
+      }
 
   private def itemSelect(actor: Side, actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
-    Select[Item, Event.PlayerUsed | Event.DealerUsed](
-      description = None,
-      options = actorItems.asSet.toVector.sortBy(_.toString).map {
+    EmptySelectPrefix.withOptions[Item, Event.PlayerUsed | Event.DealerUsed]:
+      actorItems.asSet.toVector.sortBy(_.toString).map {
         case Adrenaline =>
-          AdrenalineChoice
-            .onClickNext(stealItemSelect(actor, opponentItems, shotgun))
+          AdrenalineChoice.onClickNext(stealItemSelect(actor, opponentItems, shotgun))
         case Handcuffs =>
-          HandcuffsChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = false)(
-                FullItemUse.Handcuffs,
-                ItemUse.Handcuffs,
-              )
-            }
+          HandcuffsChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = false)(
+              FullItemUse.Handcuffs,
+              ItemUse.Handcuffs,
+            )
+          }
         case MagnifyingGlass =>
-          MagnifyingGlassChoice
-            .onClick { () =>
-              actor match
-                case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = false))
-                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = false))
-            }
+          MagnifyingGlassChoice.onClick {
+            actor match
+              case Player => Requires.NextChoice(magnifyingGlassShellSelect(stolen = false))
+              case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.MagnifyingGlass, stolen = false))
+          }
         case Beer =>
-          BeerChoice
-            .onClickNext(beerShellSelect(actor, stolen = false))
+          BeerChoice.onClickNext(beerShellSelect(actor, stolen = false))
         case Cigarettes =>
-          CigarettesChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = false)(
-                FullItemUse.Cigarettes,
-                ItemUse.Cigarettes,
-              )
-            }
+          CigarettesChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = false)(
+              FullItemUse.Cigarettes,
+              ItemUse.Cigarettes,
+            )
+          }
         case Saw =>
-          SawChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = false)(
-                FullItemUse.Saw,
-                ItemUse.Saw,
-              )
-            }
+          SawChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = false)(
+              FullItemUse.Saw,
+              ItemUse.Saw,
+            )
+          }
         case Inverter =>
-          InverterChoice
-            .onClickReady { _ =>
-              itemUseEvent(actor, stolen = false)(
-                FullItemUse.Inverter,
-                ItemUse.Inverter,
-              )
-            }
+          InverterChoice.onClickReady { _ =>
+            itemUseEvent(actor, stolen = false)(
+              FullItemUse.Inverter,
+              ItemUse.Inverter,
+            )
+          }
         case BurnerPhone =>
-          BurnerPhoneChoice
-            .onClick { () =>
-              actor match
-                case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = false))
-                case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = false))
-            }
+          BurnerPhoneChoice.onClick {
+            actor match
+              case Player => Requires.NextChoice(phonePositionSelect(shotgun, stolen = false))
+              case Dealer => Requires.Ready(Event.DealerUsed(item = ItemUse.BurnerPhone, stolen = false))
+          }
         case Meds =>
-          MedsChoice
-            .onClickNext(medsQualitySelect(actor, stolen = false))
-      },
-    )
+          MedsChoice.onClickNext(medsQualitySelect(actor, stolen = false))
+      }
 
   private def eventTypeSelect(actor: Side, actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
-    Select[EventType, Event](
-      description = None,
-      options = Seq(
-        ShotChoice
-          .onClickNext(targetSelect(actor)),
-        UsedChoice
-          .onClickNext(itemSelect(actor, actorItems, opponentItems, shotgun)),
-      ),
-    )
+    EmptySelectPrefix.withOptions:
+      Seq(
+        ShotChoice.onClickNext(targetSelect(actor)),
+        UsedChoice.onClickNext(itemSelect(actor, actorItems, opponentItems, shotgun)),
+      )
 
   private def itemUseEvent(actor: Side, stolen: Boolean)(
     player: => FullItemUse,
