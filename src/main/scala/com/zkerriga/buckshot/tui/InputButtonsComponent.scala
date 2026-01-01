@@ -8,56 +8,48 @@ object InputButtonsComponent:
     def of[A <: Singleton](value: A, text: String): ChoiceElement[A] =
       ChoiceElement(value, text, () => Label(text))
 
-    final class PartialChoice[A, Acc] private[ChoiceElement] (element: ChoiceElement[A]):
-      def onClick[R](f: Acc => Requires[R]): Choice[A, Acc, R] =
+    extension [A](element: ChoiceElement[A]) {
+      def onClick[R](f: () => Requires[R]): Choice[A, R] =
         Choice(element, f)
-      def onClickNext[B, Acc2, R](select: Select[B, Acc2, R])(builder: AccBuilder[Acc, A, Acc2]): Choice[A, Acc, R] =
-        Choice(element, acc => Requires.next(select)(builder.build(acc, element.value)))
-      def onClickReady[R](builder: AccBuilder[Acc, A, R]): Choice[A, Acc, R] =
-        Choice(element, acc => Requires.Ready(builder.build(acc, element.value)))
-
-    extension [A](element: ChoiceElement[A]) def whenState[Acc]: PartialChoice[A, Acc] = PartialChoice(element)
-
-  trait AccBuilder[Before, -A, After]:
-    def build(before: Before, value: A): After
-  object AccBuilder:
-    given [A]: AccBuilder[Unit, A, A] = (_, value) => value
+      def onClickNext[B, R](select: Select[B, R]): Choice[A, R] =
+        Choice(element, () => Requires.next(select))
+      def onClickReady[R](build: A => R): Choice[A, R] =
+        Choice(element, () => Requires.Ready(build(element.value)))
+    }
 
   sealed trait Requires[+R]
   object Requires:
-    case class NextChoice[A, Acc, R](acc: Acc, select: Select[A, Acc, R]) extends Requires[R]
+    case class NextChoice[A, R](select: Select[A, R]) extends Requires[R]
     case class Ready[R](result: R) extends Requires[R]
 
-    def next[A, Acc, R](select: Select[A, Acc, R])(on: Acc): NextChoice[A, Acc, R] = NextChoice(on, select)
+    def next[A, R](select: Select[A, R]): NextChoice[A, R] = NextChoice(select)
 
-  case class Choice[+A, Acc, +R](
+  case class Choice[+A, +R](
     value: A,
     text: String,
     label: () => Label,
-    onClick: Acc => Requires[R],
+    onClick: () => Requires[R],
   )
   object Choice:
-    def apply[A, Acc, R](element: ChoiceElement[A], onClick: Acc => Requires[R]): Choice[A, Acc, R] =
+    def apply[A, R](element: ChoiceElement[A], onClick: () => Requires[R]): Choice[A, R] =
       Choice(element.value, element.text, element.label, onClick)
 
-  case class Select[A, Acc, +R](
+  case class Select[A, +R](
     description: Option[Label],
-    options: Seq[Choice[A, Acc, R]],
+    options: Seq[Choice[A, R]],
   )
 
-  case class Accumulated[Acc](value: Acc, labels: () => Seq[Label])
+  case class Accumulated(labels: () => Seq[Label])
 
   sealed trait InputState[R]
   object InputState:
-    case class ReadyToSubmit[A, Acc, R](undo: InputState.Choose[A, Acc, R], acc: Accumulated[Acc], result: R)
-        extends InputState[R]
-    case class Choose[A, Acc, R](undo: Option[InputState[R]], acc: Accumulated[Acc], select: Select[A, Acc, R])
-        extends InputState[R]
+    case class ReadyToSubmit[A, R](undo: InputState.Choose[A, R], acc: Accumulated, result: R) extends InputState[R]
+    case class Choose[A, R](undo: Option[InputState[R]], acc: Accumulated, select: Select[A, R]) extends InputState[R]
 
   trait Submit[R]:
     def result(value: R): Unit
 
-  def render[R](initial: InputState.Choose[?, ?, R], submit: Submit[R]): Component =
+  def render[R](initial: InputState.Choose[?, R], submit: Submit[R]): Component =
     DynamicComponent
       .selfUpdatableOnly[InputState[R]](initial) { (input, update) =>
         Panel(GridLayout(2))
@@ -95,12 +87,11 @@ object InputButtonsComponent:
             select.options.map: choice =>
               button(choice.text) {
                 components.update {
-                  choice.onClick(acc.value) match
-                    case Requires.NextChoice(accValue, select) =>
+                  choice.onClick() match
+                    case Requires.NextChoice(select) =>
                       InputState.Choose(
                         undo = Some(input),
                         acc = Accumulated(
-                          value = accValue,
                           labels = () => acc.labels() :+ choice.label() :++ select.description,
                         ),
                         select = select,
@@ -108,7 +99,7 @@ object InputButtonsComponent:
                     case Requires.Ready(result) =>
                       InputState.ReadyToSubmit(
                         undo = input,
-                        acc = acc.copy(labels = () => acc.labels() :+ choice.label()),
+                        acc = Accumulated(labels = () => acc.labels() :+ choice.label()),
                         result = result,
                       )
                 }
