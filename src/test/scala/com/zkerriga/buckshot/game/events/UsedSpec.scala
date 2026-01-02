@@ -1,15 +1,10 @@
 package com.zkerriga.buckshot.game.events
 
+import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Used.ItemUse
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
-import com.zkerriga.buckshot.game.state.items.*
-import com.zkerriga.buckshot.game.state.partitipant.*
-import com.zkerriga.buckshot.game.state.partitipant.Side.Player
-import com.zkerriga.buckshot.game.state.shotgun.SeqNr.*
-import com.zkerriga.buckshot.game.state.shotgun.Shell.*
-import com.zkerriga.buckshot.game.state.shotgun.Shotgun
 import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribution}
-import com.zkerriga.buckshot.game.state.{GameState, HealthLimit}
+import com.zkerriga.buckshot.game.state.{HealthLimit, TableState}
 import com.zkerriga.types.Nat
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -17,18 +12,9 @@ import org.scalatest.wordspec.AnyWordSpec
 class UsedSpec extends AnyWordSpec, Matchers:
   "Used" should:
     "return updated player, dealer, and shotgun after using beer via stealing" in:
-      val state = GameState(
+      val state = TableState(
         maxHealth = HealthLimit[4],
-        player = Participant(
-          health = Health[2],
-          items = Items(
-            Adrenaline,
-            Cigarettes,
-            Beer,
-          ),
-          hands = Hands.Free,
-          revealed = Revealed(Shell3 -> Live),
-        ),
+        turn = Player,
         dealer = Participant(
           health = Health[2],
           items = Items(
@@ -36,7 +22,6 @@ class UsedSpec extends AnyWordSpec, Matchers:
             MagnifyingGlass,
           ),
           hands = Hands.CuffedForOneShot,
-          revealed = Revealed(Shell2 -> Blank),
         ),
         shotgun = Shotgun(
           shells = ShellDistribution(live = Nat[3], blank = Nat[3]),
@@ -45,28 +30,27 @@ class UsedSpec extends AnyWordSpec, Matchers:
             inverted = true,
           ),
         ),
-        turnOf = Player,
+        player = Participant(
+          health = Health[2],
+          items = Items(
+            Adrenaline,
+            Cigarettes,
+            Beer,
+          ),
+          hands = Hands.Free,
+        ),
       )
       val used = Used(actor = Player, item = ItemUse.Beer(out = Live), stolen = true)
       Used.execute(state, used) mustBe Right(
-        GameState(
+        TableState(
           maxHealth = HealthLimit[4],
-          player = Participant(
-            health = Health[2],
-            items = Items(
-              Cigarettes,
-              Beer,
-            ),
-            hands = Hands.Free,
-            revealed = Revealed(Shell2 -> Live),
-          ),
+          turn = Player,
           dealer = Participant(
             health = Health[2],
             items = Items(
               MagnifyingGlass,
             ),
             hands = Hands.CuffedForOneShot,
-            revealed = Revealed(Shell1 -> Blank),
           ),
           shotgun = Shotgun(
             shells = ShellDistribution(live = Nat[3], blank = Nat[2]),
@@ -75,32 +59,37 @@ class UsedSpec extends AnyWordSpec, Matchers:
               inverted = false,
             ),
           ),
-          turnOf = Player,
+          player = Participant(
+            health = Health[2],
+            items = Items(
+              Cigarettes,
+              Beer,
+            ),
+            hands = Hands.Free,
+          ),
         ),
       )
 
     "return GameOver after using bad Meds" in:
-      val state = GameState(
+      val state = TableState(
         maxHealth = HealthLimit[4],
+        turn = Player,
+        dealer = Participant(
+          health = Health[2],
+          items = Items(),
+          hands = Hands.Free,
+        ),
+        shotgun = Shotgun(
+          shells = ShellDistribution(live = Nat[3], blank = Nat[3]),
+          effects = Effects.Default,
+        ),
         player = Participant(
           health = Health[1],
           items = Items(
             Meds,
           ),
           hands = Hands.Free,
-          revealed = Revealed(),
         ),
-        dealer = Participant(
-          health = Health[2],
-          items = Items(),
-          hands = Hands.Free,
-          revealed = Revealed(),
-        ),
-        shotgun = Shotgun(
-          shells = ShellDistribution(live = Nat[3], blank = Nat[3]),
-          effects = Effects.Default,
-        ),
-        turnOf = Player,
       )
       val used = Used(actor = Player, item = ItemUse.Meds(good = false), stolen = false)
       Used.execute(state, used) mustBe Right(DealerWins)

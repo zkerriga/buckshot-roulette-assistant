@@ -3,11 +3,13 @@ package com.zkerriga.buckshot.tui
 import cats.syntax.all.*
 import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
+import com.zkerriga.buckshot.engine.BeliefState
+import com.zkerriga.buckshot.engine.state.{GameState, Revealed}
 import com.zkerriga.buckshot.game
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.shotgun.Shell
-import com.zkerriga.buckshot.game.state.{GameState, partitipant}
+import com.zkerriga.types.Chance
 
 object GameStateComponent:
   def render(game: GameState): Component =
@@ -16,33 +18,38 @@ object GameStateComponent:
   private def gameState(game: GameState): Panel =
     import LinearLayout.*
     Panel(LinearLayout(Direction.VERTICAL)).withAll(
-      participant(game, Dealer).setLayoutData(createLayoutData(Alignment.Fill)),
+      dealer(game).setLayoutData(createLayoutData(Alignment.Fill)),
       Separator(Direction.HORIZONTAL).setLayoutData(createLayoutData(Alignment.Fill)),
       EmptySpace(),
       shotgun(game.shotgun),
       EmptySpace(),
       Separator(Direction.HORIZONTAL).setLayoutData(createLayoutData(Alignment.Fill)),
-      participant(game, Player).setLayoutData(createLayoutData(Alignment.Fill)),
+      player(game).setLayoutData(createLayoutData(Alignment.Fill)),
     )
 
-  private def participant(game: GameState, side: Side): Panel =
-    def topToBottom: Seq[Component] => Seq[Component] = identity
-    def bottomToTop: Seq[Component] => Seq[Component] = _.reverse
-    val (participant, order) = side match
-      case Player => (game.player, bottomToTop)
-      case Dealer => (game.dealer, topToBottom)
-
+  private def dealer(game: GameState): Panel =
     import LinearLayout.*
-    Panel(LinearLayout(Direction.VERTICAL)).withSeq:
-      order:
-        Seq(
-          participantTitle(side, game.turnOf),
-          Separator(Direction.HORIZONTAL).setLayoutData(createLayoutData(Alignment.Fill)),
-          EmptySpace(),
-          items(participant.items),
-          EmptySpace(),
-          meta(participant, game.shotgun, game.maxHealth).setLayoutData(createLayoutData(Alignment.Fill)),
-        )
+    Panel(LinearLayout(Direction.VERTICAL)).withAll(
+      participantTitle(Dealer, game.turn),
+      Separator(Direction.HORIZONTAL).setLayoutData(createLayoutData(Alignment.Fill)),
+      EmptySpace(),
+      items(game.dealer.items),
+      EmptySpace(),
+      meta(game.dealer, game.knowledge.dealer, game.shotgun, game.maxHealth)
+        .setLayoutData(createLayoutData(Alignment.Fill)),
+    )
+
+  private def player(game: GameState): Panel =
+    import LinearLayout.*
+    Panel(LinearLayout(Direction.VERTICAL)).withAll(
+      meta(game.player, BeliefState.deterministic(game.knowledge.player), game.shotgun, game.maxHealth)
+        .setLayoutData(createLayoutData(Alignment.Fill)),
+      EmptySpace(),
+      items(game.player.items),
+      EmptySpace(),
+      Separator(Direction.HORIZONTAL).setLayoutData(createLayoutData(Alignment.Fill)),
+      participantTitle(Player, game.turn),
+    )
 
   private def participantTitle(side: Side, turnOf: Side): Panel =
     Panel(GridLayout(2)).withSeq:
@@ -90,13 +97,13 @@ object GameStateComponent:
           case Some(Blank) => Label("B").setBackgroundColor(TextColor.ANSI.BLUE)
           case None => Label("?").setBackgroundColor(TextColor.ANSI.BLACK_BRIGHT)
 
-  private def meta(participant: Participant, shotgun: Shotgun, maxHealth: HealthLimit): Panel =
+  private def meta(participant: Participant, known: BeliefState[Revealed], shotgun: Shotgun, max: HealthLimit): Panel =
     import GridLayout.*
     Panel(GridLayout(4)).withAll(
-      revealed(participant.revealed, shotgun).setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
+      revealed(known, shotgun).setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
       EmptySpace().setLayoutData(createHorizontallyFilledLayoutData()),
       hands(participant.hands).setLayoutData(createLayoutData(Alignment.END, Alignment.CENTER)),
-      health(participant.health, maxHealth).setLayoutData(createLayoutData(Alignment.END, Alignment.CENTER)),
+      health(participant.health, max).setLayoutData(createLayoutData(Alignment.END, Alignment.CENTER)),
     )
 
   private def hands(hands: Hands): Label =
@@ -105,18 +112,18 @@ object GameStateComponent:
       case Hands.CuffedForTwoShots => Label("Cuffed (2)")
       case Hands.CuffedForOneShot => Label("Cuffed (1)")
 
-  private def revealed(revealed: Revealed, shotgun: Shotgun): Panel =
-    val shellSequence =
-      Seq(Shell1, Shell2, Shell3, Shell4, Shell5, Shell6, Shell7, Shell8)
-        .take(shotgun.total)
-        .map(revealed.get)
-    Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-      Label("Knows"),
-      shells(shellSequence),
-    )
+  private def revealed(states: BeliefState[Revealed], shotgun: Shotgun): Panel =
+    val shellsToShow = Seq(Shell1, Shell2, Shell3, Shell4, Shell5, Shell6, Shell7, Shell8).take(shotgun.total)
+    Panel(LinearLayout(Direction.VERTICAL)).withSeq:
+      states.asSortedSeq.map: (chance, revealed) =>
+        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+          Label("Knows"),
+          shells(shellsToShow.map(revealed.get)),
+          Label(if chance != Chance.Certain then chance.show else ""),
+        )
 
   private def health(current: Health, limit: HealthLimit): Label =
-    Label(("☇" * current).padTo(limit, '-').reverse)
+    Label(("☇" * current.asInt).padTo(limit.asInt, '-').reverse)
 
   private def shotgunShells(shotgun: Shotgun.ShellDistribution): Panel =
     Panel(GridLayout(2)).withAll(

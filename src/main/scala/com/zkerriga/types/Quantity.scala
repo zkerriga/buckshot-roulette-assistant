@@ -2,18 +2,12 @@ package com.zkerriga.types
 
 /** A positive natural number
   */
-opaque type Quantity = Nat
+opaque type Quantity <: Nat = Nat
 
 object Quantity:
-  import Nat.{decreased as dec, increased as inc}
-
   extension (quantity: Quantity)
-    def increased: Quantity = quantity.inc
-    def decreased: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity.dec).flatten
-
-  given Ordering[Quantity] = summon[Ordering[Nat]]
-  given Conversion[Quantity, Nat] = identity
-  given Conversion[Quantity, Int] = summon[Conversion[Nat, Int]].apply
+    def increased: Quantity = quantity plus Nat[1]
+    def decreased: Option[Quantity] = Option.unless(quantity == Nat[1])(quantity minus Nat[1]).flatten
 
   inline def apply[N <: Int](using ev: ValueOf[N]): Quantity =
     inline if ev.value > 0 then Nat[N]

@@ -1,15 +1,24 @@
-package com.zkerriga.buckshot.game.state.partitipant
+package com.zkerriga.buckshot.engine.state
 
+import cats.Eq
 import com.zkerriga.buckshot.game.state.shotgun.SeqNr.*
 import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
+import com.zkerriga.types.Nat
+import com.zkerriga.types.Nat.countNat
 
 opaque type Revealed = Map[SeqNr, Shell]
 
 object Revealed:
+  val Nothing: Revealed = Map.empty
+
   def apply(revealed: (SeqNr, Shell)*): Revealed = revealed.toMap
 
   extension (revealed: Revealed)
     def get(seqNr: SeqNr): Option[Shell] = revealed.get(seqNr)
+    def count(shell: Shell): Nat = revealed.values.countNat(_ == shell)
+    def except(at: SeqNr): Revealed = revealed - at
+    infix def combine(other: Revealed): Revealed = revealed ++ other
+
     def revealed(shell: Shell, at: SeqNr): Revealed = revealed.updated(at, shell)
 
     def afterShellOut: Revealed =
@@ -24,3 +33,5 @@ object Revealed:
           case Shell7 => Some(Shell6)
           case Shell8 => Some(Shell7)
         moved.map(_ -> shell)
+
+  given Eq[Revealed] = Eq.fromUniversalEquals

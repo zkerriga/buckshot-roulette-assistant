@@ -14,6 +14,7 @@ object Items:
         case None => Some(Quantity[1])
 
   extension (owned: Items)
+    def empty: Boolean = owned.isEmpty
     def contain(item: Item): Boolean = owned.contains(item)
     def removed(item: Item): V[Items] =
       for quantity <- owned.get(item).toRight(MissingItem(item))
@@ -21,6 +22,7 @@ object Items:
         case Some(newQuantity) => owned.updated(item, newQuantity)
         case None => owned - item
 
+    def asSet: Set[Item] = owned.keySet
     def asList: List[Item] =
       owned.toList.flatMap: (item, quantity) =>
         List.fill(quantity)(item)

@@ -13,6 +13,6 @@ object Hands:
       if free then CuffedForTwoShots.ok
       else HandsAlreadyCuffed.lift
 
-    def afterShot: Hands = hands match
+    def afterTurn: Hands = hands match
       case Free | CuffedForOneShot => Free
       case CuffedForTwoShots => CuffedForOneShot
