@@ -23,13 +23,16 @@ object DealerAi:
       (dealer has item) || ((dealer has Adrenaline) && (player has item))
 
     def wantsMagnifyingGlass = nextShell == Unknown
-    def wantsHandcuffs = player.hands.free && shotgun.total > Nat[1]
+    def wantsHandcuffs = player.hands.free && shotgun.total > Nat[1] // todo: more than 2?
     def wantsCigarettes = dealer.health < maxHealth.maxAllowed
     def wantsMeds = dealer.health < maxHealth.maxAllowed && dealer.health > Health[1] && !canUse(Cigarettes)
     def wantsBeer = nextShell != Known(Live) && shotgun.total > Nat[1]
-    def wantsSaw = shotgun.damage != Damage.Double && nextShell == Known(Live)
+    def wantsSaw =
+      shotgun.damage != Damage.Double && nextShell == Known(Live) // todo: simply whenever Dealer wants to shot Player?
     def wantsBurnerPhone = shotgun.total > Nat[2]
     def wantsInverter = nextShell == Known(Blank)
+
+    // todo: adrenaline: tries to use Dealer's item if possible, otherwise considers adrenaline (except for meds check)
 
     def wants(item: RegularItem, condition: Boolean): Option[RegularItem] =
       Option.when(canUse(item) && condition)(item)
@@ -87,6 +90,7 @@ object DealerAi:
 
   private object SimpleChance:
     // todo: does this have to consider dealer's knowledge?
+    // todo: looks like it does not consider their knowledge
     def evaluate(shotgun: Shotgun): SimpleChance =
       if shotgun.live == shotgun.blank then FiftyFifty
       else if shotgun.live > shotgun.blank then Rather(Live)
