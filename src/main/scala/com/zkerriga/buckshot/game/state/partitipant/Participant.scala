@@ -32,8 +32,8 @@ object Participant:
       participant.hands.cuffed.map: updated =>
         participant.copy(hands = updated)
 
-    def afterShot: Participant =
-      participant.copy(hands = participant.hands.afterShot)
+    def afterTurn: Participant =
+      participant.copy(hands = participant.hands.afterTurn)
 
     infix def has(item: Item): Boolean = participant.items.contain(item)
     infix def hasNo(item: Item): Boolean = !has(item)

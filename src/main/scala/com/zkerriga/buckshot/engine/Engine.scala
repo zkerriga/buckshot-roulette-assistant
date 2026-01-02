@@ -1,18 +1,16 @@
 package com.zkerriga.buckshot.engine
 
+import cats.Eq
 import com.zkerriga.buckshot.engine.Engine.*
+import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.events.{DealerShot, DealerUsed, PlayerShot, PlayerUsed}
 import com.zkerriga.buckshot.engine.state.GameState
+import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
 import com.zkerriga.buckshot.game.events.{Shot, Used, outcome}
-import com.zkerriga.buckshot.game.state.items.RegularItem
-import com.zkerriga.buckshot.game.state.partitipant.Side.{Dealer, Player}
-import com.zkerriga.buckshot.game.state.partitipant.{Items, Side}
-import com.zkerriga.buckshot.game.state.shotgun.Shotgun
-import com.zkerriga.buckshot.game.state.{TableState, partitipant}
 import com.zkerriga.buckshot.journal.AppLog.Logging
-import com.zkerriga.types.Ref
+import com.zkerriga.types.{Nat, Ref}
 
 class Engine(state: Ref[GameOver | Reset | GameState]):
   def getState: Either[ErrorText, GameState] =
@@ -61,7 +59,7 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
                 log.debug(s"state chanced to $newState")
                 val dealerPrediction =
                   Option.when(newState.turn == Dealer):
-                    DealerPrediction(Distribution.deterministic(Vector(Action.Shoot(Player)))) // todo: implement
+                    DealerPrediction.from(newState)
                 (newState, EventReply.NewState(newState, dealer = dealerPrediction).ok)
 
   def continue(shells: Shotgun.ShellDistribution, dealer: Items, player: Items): Either[ErrorText, GameState] =
@@ -103,8 +101,29 @@ object Engine extends Logging:
   enum Action:
     case Shoot(target: Side)
     case Use(item: RegularItem, steal: Boolean)
+  object Action:
+    given Eq[Action] = Eq.fromUniversalEquals
 
-  case class DealerPrediction(actions: Distribution[Vector[Action]])
+  case class DealerPrediction(actions: Distribution[Action])
+  object DealerPrediction:
+    def from(game: GameState): DealerPrediction = DealerPrediction {
+      game.knowledge.dealer.getDistribution.flatMap { revealed =>
+        DealerAi.next(game.public, revealed) match {
+          case DealerAi.Action.Use(item, steal) => Distribution.deterministic(Action.Use(item, steal))
+          case DealerAi.Action.Shoot(target) => Distribution.deterministic(Action.Shoot(target))
+          case DealerAi.Action.Guess(live, blank) =>
+            Distribution.weighted(
+              Nat[1] -> (live match {
+                case DealerAi.Action.Use(Saw, false) => Action.Use(Saw, steal = false)
+                case DealerAi.Action.Shoot(Player) => Action.Shoot(Player)
+              }),
+              Nat[1] -> (blank match {
+                case DealerAi.Action.Shoot(Dealer) => Action.Shoot(Dealer)
+              }),
+            )
+        }
+      }.deduplicate
+    }
 
   def start(table: TableState): Engine =
     log.info(s"starting engine with $table")

@@ -12,9 +12,10 @@ import com.zkerriga.buckshot.game.events.Used
 import com.zkerriga.buckshot.game.events.Used.ItemUse
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
 import com.zkerriga.buckshot.game.state.TableState
+import com.zkerriga.buckshot.journal.AppLog.Logging
 import com.zkerriga.types.{Chance, Nat}
 
-object DealerUsed:
+object DealerUsed extends Logging:
   def execute(state: GameState, used: Used[Dealer.type]): V[GameOver | Reset | GameState] =
     Used
       .execute(state.public, used)
@@ -35,14 +36,16 @@ object DealerUsed:
       case ItemUse.Beer(out) => missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out)
       case _ => false
 
+    val usedItem = Used.itemOf(used.item)
+
     if beerMiss then Chance.NoChance
     else
       DealerAi.next(oldState.public, knowledge) match
-        case Action.Use(item, steal) => Chance.certainWhen(item == used.item && steal == used.stolen)
+        case Action.Use(item, steal) => Chance.certainWhen(usedItem == item && steal == used.stolen)
         case Action.Shoot(_) => Chance.NoChance
         case Action.Guess(live, Action.Shoot(Dealer)) =>
           live match
-            case Action.Use(Saw, false) => Chance.certainWhen(used.item == Saw && !used.stolen) and Chance.CoinFlip
+            case Action.Use(Saw, false) => Chance.certainWhen(usedItem == Saw && !used.stolen) and Chance.CoinFlip
             case Action.Shoot(Player) => Chance.NoChance
 
   private def transformDealer(

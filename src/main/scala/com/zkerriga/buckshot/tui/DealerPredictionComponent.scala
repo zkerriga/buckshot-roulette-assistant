@@ -9,10 +9,8 @@ object DealerPredictionComponent:
       case Some(actions) => prediction(actions).withBorder(Borders.singleLine("Dealer Prediction"))
       case None => Panel()
 
-  private def title(): Label = Label("Dealer Prediction")
-
   private def prediction(actions: DealerPrediction): Panel =
-    Panel(LinearLayout(Direction.VERTICAL)).withAll(
-      Label("TODO"), // todo: implement
-      Label("TODO"),
+    Panel(LinearLayout(Direction.VERTICAL)).withSeq(
+      // todo: stupid for now, implement later
+      actions.actions.toString.sliding(40, 40).toSeq.map(line => Label(line)),
     )

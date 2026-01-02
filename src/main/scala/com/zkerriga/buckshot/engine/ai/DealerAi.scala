@@ -35,9 +35,11 @@ object DealerAi:
       Option.when(canUse(item) && condition)(item)
 
     val wantsToUse =
-      wants(MagnifyingGlass, wantsMagnifyingGlass)
-        .orElse(wants(Handcuffs, wantsHandcuffs))
+      Option
+        .empty[RegularItem]
         .orElse(wants(Cigarettes, wantsCigarettes))
+        .orElse(wants(Handcuffs, wantsHandcuffs))
+        .orElse(wants(MagnifyingGlass, wantsMagnifyingGlass))
         .orElse(wants(Meds, wantsMeds))
         .orElse(wants(Beer, wantsBeer))
         .orElse(wants(Saw, wantsSaw))

@@ -21,6 +21,7 @@ object DynamicComponent extends Logging:
         val headIsFocused = head match
           case interactable: Interactable => Option.when(interactable.isFocused)(interactable)
           case panel: Panel => searchFocused(panel.getChildren)
+          case border: Border => searchFocused(List(border.getComponent))
           case _ => None
         headIsFocused.orElse(searchFocused(next))
 
@@ -31,6 +32,7 @@ object DynamicComponent extends Logging:
         val headIsFocusable = head match
           case interactable: Interactable => Option.when(interactable.isFocusable)(interactable)
           case panel: Panel => searchFirstFocusable(panel.getChildren)
+          case border: Border => searchFirstFocusable(List(border.getComponent))
           case _ => None
         headIsFocusable.orElse(searchFirstFocusable(next))
 

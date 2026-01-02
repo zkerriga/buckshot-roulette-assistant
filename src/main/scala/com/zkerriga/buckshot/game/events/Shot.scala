@@ -54,11 +54,12 @@ object Shot:
           )
 
   private def buildNextState(state: TableState, updated: PostShotgun, shot: Shot[Side]): TableState =
-    val dealer = updated.damaged.dealer.afterShot
-    val player = updated.damaged.player.afterShot
+    val keepsTurn = isProlongedTurn(shot)
+    val dealer = if keepsTurn then updated.damaged.dealer else updated.damaged.dealer.afterTurn
+    val player = if keepsTurn then updated.damaged.player else updated.damaged.player.afterTurn
     val nextTurn = state.turn match
-      case Player => if keepsTurn(shot, opponent = dealer) then Player else Dealer
-      case Dealer => if keepsTurn(shot, opponent = player) then Dealer else Player
+      case Player => if keepsTurn || !dealer.hands.free then Player else Dealer
+      case Dealer => if keepsTurn || !player.hands.free then Dealer else Player
     state.copy(
       turn = nextTurn,
       dealer = dealer,
@@ -66,5 +67,4 @@ object Shot:
       player = player,
     )
 
-  private def keepsTurn(shot: Shot[Side], opponent: Participant): Boolean =
-    (shot.shell == Blank && shot.target == shot.actor) || !opponent.hands.free
+  private def isProlongedTurn(shot: Shot[Side]): Boolean = shot.shell == Blank && shot.target == shot.actor

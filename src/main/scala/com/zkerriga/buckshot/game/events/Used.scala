@@ -62,7 +62,7 @@ object Used:
       for user <- state.actor.without(item)
       yield Participants(user = user, opponent = state.opponent)
 
-  private def itemOf(use: ItemUse): RegularItem = use match
+  def itemOf(use: ItemUse): RegularItem = use match
     case Handcuffs => RegularItem.Handcuffs
     case MagnifyingGlass => RegularItem.MagnifyingGlass
     case _: Beer => RegularItem.Beer

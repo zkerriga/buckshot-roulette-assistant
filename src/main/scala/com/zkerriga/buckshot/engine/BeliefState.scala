@@ -16,6 +16,7 @@ object BeliefState:
     Distribution.unsafe(value, values*)
 
   extension [A](belief: BeliefState[A])
+    def getDistribution: Distribution[A] = belief
     def asSortedSeq(using Ordering[Chance]): Seq[(chance: Chance, value: A)] =
       belief.asSeq.sortBy(_.chance)
 
