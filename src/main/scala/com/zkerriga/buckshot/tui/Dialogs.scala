@@ -22,6 +22,6 @@ class Dialogs(gui: WindowBasedTextGUI):
     MessageDialog.showMessageDialog(
       gui,
       "Shotgun Empty",
-      s"Shotgun is empty, current state is $reset", // todo: think of game continuation
+      "Shotgun is empty",
       MessageDialogButton.OK,
     )

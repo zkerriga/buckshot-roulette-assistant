@@ -46,7 +46,7 @@ object DealerAi:
     RegularItem.All.filter {
       case MagnifyingGlass => next == Unknown && shotgun.total > Nat[1]
       case Cigarettes => dealer.health < maxHealth.maxAllowed
-      case Meds => dealer.health < maxHealth.maxAllowed && !alreadyUsedMeds && !canUseCigs
+      case Meds => dealer.health < maxHealth.maxAllowed && dealer.health > Health[1] && !alreadyUsedMeds && !canUseCigs
       case Beer => next != Known(Live) && shotgun.total > Nat[1]
       case Handcuffs => player.hands.free && shotgun.total > Nat[1]
       case Saw => shotgun.damage != Damage.Double && next == Known(Live)

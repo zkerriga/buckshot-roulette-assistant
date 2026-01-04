@@ -6,6 +6,7 @@ import com.zkerriga.buckshot.game.state.shotgun
 import com.zkerriga.types.Nat
 
 object ShellChances {
+  // todo: considers dealer knowledge that should not be relevant already (Burner phone?)
   def consideringEverything(state: GameState, at: SeqNr): Distribution[Shell] =
     val distribution = state.hidden.dealer.belief.getDistribution
       .flatMap(dealer => shellAt(state.public.shotgun, state.hidden.player.revealed, dealer, at))
