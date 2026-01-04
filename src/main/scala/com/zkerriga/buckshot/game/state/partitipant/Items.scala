@@ -12,10 +12,10 @@ object Items:
   case class ItemOn(item: RegularItem, on: Slot)
 
   val Empty: Items = Items(Set.empty, Seq.empty)
-  def from(items: Seq[(item: Item, on: Slot)]): Items =
+  def from(items: Seq[(slot: Slot, item: Item)]): Items =
     val (adrenaline, positioned) = items.partitionMap:
-      case (Adrenaline, slot) => Left(slot)
-      case (item: RegularItem, slot) => Right(ItemOn(item, slot))
+      case (item = Adrenaline, slot = slot) => Left(slot)
+      case (item = item: RegularItem, slot = slot) => Right(ItemOn(item, slot))
     Items(adrenaline.toSet, positioned)
 
   extension (owned: Items)

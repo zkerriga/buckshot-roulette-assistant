@@ -5,7 +5,7 @@ import com.googlecode.lanterna.gui2.GridLayout.{Alignment, createLayoutData}
 import com.zkerriga.buckshot.game.all.*
 
 object ItemGridComponent:
-  def render[A](items: Items)(renderer: (Option[Item], Slot) => Component): Component = {
+  def render[A](items: Items)(renderer: (Option[Item], Slot) => Component): Panel = {
     def gridOf(slots: Seq[Slot]): Panel =
       import GridLayout.*
       Panel(GridLayout(2)).withSeq(

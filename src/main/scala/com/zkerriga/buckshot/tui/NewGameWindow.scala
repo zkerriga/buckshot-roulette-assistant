@@ -50,6 +50,7 @@ object NewGameWindow {
             ),
           )
           submit.state(state)
+          window.close()
         },
     )
     import LinearLayout.*
@@ -58,6 +59,7 @@ object NewGameWindow {
       startButton.setLayoutData(createLayoutData(Alignment.End)),
       QuitButton.render(window).setLayoutData(createLayoutData(Alignment.End)),
     )
+    window.setComponent(content)
     window
 
   private trait Get[A]:
@@ -184,7 +186,7 @@ object NewGameWindow {
           .map(box => Option(box.getSelectedItem))
           .zip(Slot.values)
           .collect:
-            case (Some(item: Item), slot) => (item, slot)
+            case (Some(item: Item), slot) => slot -> item
       }
     }
 }

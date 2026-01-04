@@ -69,7 +69,7 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
       case over: GameOver => (over, "game over".error)
       case state: GameState => (state, "in progress".error)
       case reset: Reset =>
-        val state = ???
+        val state = ??? // todo: implement transition
         log.info(s"state reinitialized to $state")
         (state, state.ok)
 

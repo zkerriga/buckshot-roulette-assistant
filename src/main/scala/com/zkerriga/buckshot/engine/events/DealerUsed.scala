@@ -17,14 +17,14 @@ import com.zkerriga.buckshot.game.state.partitipant.Items.ItemOn
 import com.zkerriga.buckshot.journal.AppLog.Logging
 import com.zkerriga.types.{Chance, Nat}
 
-case class DealerUsed(item: ItemUse, on: Slot, viaAdrenalineOn: Option[Slot])
+case class DealerUsed(item: ItemUse, on: Slot, viaAdrenaline: Option[Slot])
 
 object DealerUsed extends Logging:
   def execute(state: GameState, used: DealerUsed): V[GameOver | Reset | GameState] =
     Used
       .execute(
         state.public,
-        Used(actor = Dealer, item = used.item, on = used.on, viaAdrenalineOn = used.viaAdrenalineOn),
+        Used(actor = Dealer, item = used.item, on = used.on, viaAdrenalineOn = used.viaAdrenaline),
       )
       .flatMap:
         case outcome: (GameOver | Reset) => outcome.ok
@@ -76,7 +76,7 @@ object DealerUsed extends Logging:
         case ItemUse.Beer(out) => adjusted.update(_.afterShellOut)
         case _ => adjusted
       }
-      adjustedNotes = used.viaAdrenalineOn match {
+      adjustedNotes = used.viaAdrenaline match {
         case Some(_) => knowledge.notes
         case None => knowledge.notes.withoutItemOn(used.on)
       }
@@ -115,7 +115,7 @@ object DealerUsed extends Logging:
     if beerMiss then Chance.NoChance
     else {
       val itemOn = ItemOn(used.item.toItem, used.on)
-      val realAction = used.viaAdrenalineOn match {
+      val realAction = used.viaAdrenaline match {
         case Some(_) => DealerAi.Action.Steal(itemOn)
         case None => DealerAi.Action.Use(itemOn)
       }
