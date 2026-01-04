@@ -1,11 +1,9 @@
 package com.zkerriga.buckshot.game.events.outcome
 
-import com.zkerriga.buckshot.game.state.items.Item
-
 enum ErrorMsg:
   case WrongTurn
   case ShotgunStateMismatch
-  case MissingItem(item: Item)
+  case MissingItem
   case SawAlreadyUsed
   case HandsAlreadyCuffed
 

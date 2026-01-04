@@ -14,5 +14,9 @@ object Printer:
   def print(s: Shotgun): String =
     s"Shotgun(shells=ShellDistribution(live=Nat[${s.live}], Nat[${s.blank}]),effects=Effects(damage = Damage.${s.damage},inverted=${s.inverted}))"
 
-  def print(items: Items): String =
-    s"Items(${items.asList.mkString(",")})"
+  def print(items: Items): String = {
+    val positioned = items.positioned.map { itemOn =>
+      s"ItemOn(item=${itemOn.item},on=${itemOn.on})"
+    }
+    s"Items(adrenaline=${items.adrenaline},positioned=$positioned)"
+  }

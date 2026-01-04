@@ -1,32 +1,39 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
-import com.zkerriga.buckshot.game.state.items.{Item, RegularItem}
-import com.zkerriga.types.Quantity
+import com.zkerriga.buckshot.game.state.items.*
+import com.zkerriga.buckshot.game.state.partitipant.Items.ItemOn
 
-opaque type Items = Map[Item, Quantity]
+case class Items(
+  adrenaline: Set[Slot],
+  positioned: Seq[ItemOn],
+)
 
 object Items:
-  def apply(items: Item*): Items =
-    items.foldLeft(Map.empty[Item, Quantity]): (owned, item) =>
-      owned.updatedWith(item):
-        case Some(existing) => Some(existing.increased)
-        case None => Some(Quantity[1])
+  case class ItemOn(item: RegularItem, on: Slot)
+
+  val Empty: Items = Items(Set.empty, Seq.empty)
+  def apply(items: (Slot, Item)*): Items = from(items)
+  def from(items: Seq[(slot: Slot, item: Item)]): Items =
+    val (adrenaline, positioned) = items.partitionMap:
+      case (item = Adrenaline, slot = slot) => Left(slot)
+      case (item = item: RegularItem, slot = slot) => Right(ItemOn(item, slot))
+    Items(adrenaline.toSet, positioned)
 
   extension (owned: Items)
-    def empty: Boolean = owned.isEmpty
-    def contain(item: Item): Boolean = owned.contains(item)
-    def removed(item: Item): V[Items] =
-      for quantity <- owned.get(item).toRight(MissingItem(item))
-      yield quantity.decreased match
-        case Some(newQuantity) => owned.updated(item, newQuantity)
-        case None => owned - item
+    def isEmpty: Boolean =
+      owned.adrenaline.isEmpty && owned.positioned.isEmpty
 
-    def asSet: Set[Item] = owned.keySet
-    def asList: List[Item] =
-      owned.toList.flatMap: (item, quantity) =>
-        List.fill(quantity)(item)
+    def contain(item: RegularItem): Boolean = owned.positioned.exists(_.item == item)
+    def containAdrenaline: Boolean = owned.adrenaline.nonEmpty
 
-    def getRegular: Set[RegularItem] =
-      owned.keySet.collect:
-        case item: RegularItem => item
+    def without(item: ItemOn): Items =
+      owned.copy(positioned = owned.positioned.filterNot(_ == item))
+
+    def withoutAdrenaline(on: Slot): Items =
+      owned.copy(adrenaline = owned.adrenaline - on)
+
+    def on(slot: Slot): Option[Item] =
+      owned.positioned
+        .find(_.on == slot)
+        .map(_.item)
+        .orElse(Option.when(owned.adrenaline.contains(slot))(Adrenaline))

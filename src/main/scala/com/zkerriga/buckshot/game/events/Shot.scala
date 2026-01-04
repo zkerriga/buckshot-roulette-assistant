@@ -8,13 +8,13 @@ import com.zkerriga.buckshot.game.state.partitipant.{Hands, Participant, Side}
 import com.zkerriga.buckshot.game.state.shotgun.Shell.*
 import com.zkerriga.buckshot.game.state.shotgun.{Shell, Shotgun}
 
-case class Shot[+Actor <: Side](actor: Actor, target: Side, shell: Shell)
+case class Shot(actor: Side, target: Side, shell: Shell)
 
 object Shot:
   private case class PostDamage(dealer: Participant, player: Participant)
   private case class PostShotgun(damaged: PostDamage, shotgun: Shotgun)
 
-  def execute(state: TableState, shot: Shot[Side]): V[GameOver | Reset | TableState] =
+  def execute(state: TableState, shot: Shot): V[GameOver | Reset | TableState] =
     for
       _ <- (state.turn == shot.actor) trueOr WrongTurn
       postShotgun <- processDamage(state, shot) match
@@ -24,7 +24,7 @@ object Shot:
       case outcome: (GameOver | Reset) => outcome
       case updated: PostShotgun => buildNextState(state, updated, shot)
 
-  private def processDamage(state: TableState, shot: Shot[Side]): GameOver | PostDamage =
+  private def processDamage(state: TableState, shot: Shot): GameOver | PostDamage =
     shot.shell match
       case Blank => PostDamage(dealer = state.dealer, player = state.player)
       case Live =>
@@ -41,7 +41,7 @@ object Shot:
               .fold(PlayerWins(dealer = state.dealer.items, player = state.player.items)): dealer =>
                 PostDamage(dealer = dealer, player = state.player)
 
-  private def processShotgun(state: TableState, shot: Shot[Side], damaged: PostDamage): V[Reset | PostShotgun] =
+  private def processShotgun(state: TableState, shot: Shot, damaged: PostDamage): V[Reset | PostShotgun] =
     state.shotgun
       .shellOut(shot.shell)
       .map:
@@ -53,7 +53,7 @@ object Shot:
             player = damaged.player,
           )
 
-  private def buildNextState(state: TableState, updated: PostShotgun, shot: Shot[Side]): TableState =
+  private def buildNextState(state: TableState, updated: PostShotgun, shot: Shot): TableState =
     val keepsTurn = isProlongedTurn(shot)
     val dealer = if keepsTurn then updated.damaged.dealer else updated.damaged.dealer.afterTurn
     val player = if keepsTurn then updated.damaged.player else updated.damaged.player.afterTurn
@@ -67,4 +67,4 @@ object Shot:
       player = player,
     )
 
-  private def isProlongedTurn(shot: Shot[Side]): Boolean = shot.shell == Blank && shot.target == shot.actor
+  private def isProlongedTurn(shot: Shot): Boolean = shot.shell == Blank && shot.target == shot.actor

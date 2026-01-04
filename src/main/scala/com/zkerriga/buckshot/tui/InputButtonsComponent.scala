@@ -2,6 +2,9 @@ package com.zkerriga.buckshot.tui
 
 import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
+import com.zkerriga.buckshot.game.state.items.{Item, Slot}
+import com.zkerriga.buckshot.game.state.partitipant.Items
+import com.zkerriga.buckshot.tui.ItemGridComponent.{NoItem, labelName}
 
 object InputButtonsComponent:
   case class ChoiceElement[+A](
@@ -19,6 +22,13 @@ object InputButtonsComponent:
     ): ChoiceElement[A] =
       ChoiceElement(value, text, front = front, back = back)
 
+    def ofItem[I <: Item & Singleton](
+      item: I,
+      front: Option[TextColor.ANSI] = None,
+      back: Option[TextColor.ANSI] = None,
+    ): ChoiceElement[I] =
+      ChoiceElement(item, item.labelName, front = front, back = back)
+
     extension [A](choice: ChoiceElement[A])
       def onClick[R](requires: Requires[R]): Choice[A, R] = Choice(choice, requires)
       def onClickNext[B, R](select: Select[B, R]): Choice[A, R] = Choice(choice, Requires.NextChoice(select))
@@ -34,7 +44,11 @@ object InputButtonsComponent:
   case class SelectPrefix(text: Option[String] = None)
   object SelectPrefix:
     extension (prefix: SelectPrefix)
-      def withOptions[A, R](options: Seq[Choice[A, R]]): Select[A, R] = Select(prefix, options)
+      def withOptions[A, R](options: Seq[Choice[A, R]]): Select.ChooseOption[A, R] =
+        Select.ChooseOption(prefix, options)
+      def withItems[R](items: Items)(choice: (Item, Slot) => Option[Choice[Item, R]]): Select.ChooseItem[R] =
+        Select.ChooseItem(prefix, items, choice)
+
       private[InputButtonsComponent] def label: Option[Label] =
         prefix.text.map(Label(_))
 
@@ -52,7 +66,16 @@ object InputButtonsComponent:
         acc.passed.flatMap: (select, choice) =>
           select.label.toSeq :+ choice.label
 
-  case class Select[A, +R](prefix: SelectPrefix, options: Seq[Choice[A, R]])
+  sealed trait Select[A, +R]:
+    val prefix: SelectPrefix
+  object Select:
+    case class ChooseOption[A, R](prefix: SelectPrefix, options: Seq[Choice[A, R]]) extends Select[A, R]
+    case class ChooseItem[R](
+      prefix: SelectPrefix,
+      items: Items,
+      choice: (Item, Slot) => Option[Choice[Item, R]],
+    ) extends Select[Item, R]
+
   case class InputState[R](undo: Option[InputState[R]], acc: Accumulated, next: Requires[R])
 
   trait Submit[R]:
@@ -93,22 +116,36 @@ object InputButtonsComponent:
           undoButtonComponent,
         )
       case Requires.NextChoice(select) =>
+        def choiceButton[A](choice: Choice[A, R]): Button =
+          button(choice.element.text) {
+            components.update {
+              InputState(
+                undo = Some(input),
+                acc = input.acc.add(select.prefix, choice.element),
+                next = choice.onClick,
+              )
+            }
+          }
         def mainButtons: Panel =
-          val totalChoices = select.options.size
-          val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
-          Panel(GridLayout(bestGridColumns)).withSeq:
-            select.options.map: choice =>
-              button(choice.element.text) {
-                components.update {
-                  InputState(
-                    undo = Some(input),
-                    acc = input.acc.add(select.prefix, choice.element),
-                    next = choice.onClick,
-                  )
-                }
-              }
-        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+          select match
+            case Select.ChooseOption(prefix, options) =>
+              val totalChoices = options.size
+              val bestGridColumns = math.ceil(math.sqrt(totalChoices)).toInt
+              Panel(GridLayout(bestGridColumns)).withSeq:
+                options.map(choiceButton)
+
+            case Select.ChooseItem(prefix, items, choice) =>
+              ItemGridComponent.render(items): (itemOpt, slot) =>
+                itemOpt match
+                  case Some(item) =>
+                    choice(item, slot) match
+                      case Some(choice) => choiceButton(choice)
+                      case None => Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                  case None => Button(NoItem, () => ())
+
+        Panel(LinearLayout(Direction.VERTICAL)).withAll(
           mainButtons,
+          EmptySpace(),
           undoButtonComponent,
         )
 

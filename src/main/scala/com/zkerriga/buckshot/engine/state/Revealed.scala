@@ -17,7 +17,7 @@ object Revealed:
     def get(seqNr: SeqNr): Option[Shell] = revealed.get(seqNr)
     def count(shell: Shell): Nat = revealed.values.countNat(_ == shell)
     def except(at: SeqNr): Revealed = revealed - at
-    infix def combine(other: Revealed): Revealed = revealed ++ other
+    def combineWith(other: Revealed): Revealed = revealed ++ other
 
     def revealed(shell: Shell, at: SeqNr): Revealed = revealed.updated(at, shell)
 

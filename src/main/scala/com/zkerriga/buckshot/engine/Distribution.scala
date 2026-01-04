@@ -30,6 +30,19 @@ object Distribution:
   extension [A](values: Distribution[A])
     def asSeq: Seq[Possible[A]] = values.toSeq
 
+    /** @note
+      *   call on deduplicated [[Distribution]]
+      */
+    def chanceOf(value: A)(using Eq[A]): Chance =
+      values
+        .find(_.value === value)
+        .map(_.chance)
+        .getOrElse(Chance.NoChance)
+
+    def exists(f: A => Boolean): Boolean =
+      values.exists: (_, value) =>
+        f(value)
+
     def map[B](f: A => B): Distribution[B] =
       values.map: (chance, value) =>
         chance -> f(value)
@@ -38,6 +51,9 @@ object Distribution:
       values.flatMap: (aChance, a) =>
         f(a).map: (bChance, b) =>
           (aChance and bChance) -> b
+
+    def foldLeft[B](initial: B)(f: (B, Possible[A]) => B): B =
+      values.foldLeft(initial)(f)
 
     def updateChances(f: (Chance, A) => Chance): Option[Distribution[A]] =
       NonEmptySeq
