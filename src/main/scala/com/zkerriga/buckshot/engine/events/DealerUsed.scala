@@ -8,7 +8,7 @@ import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, Dealer
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.engine.{Distribution, ShellChances}
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
+import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
 import com.zkerriga.buckshot.game.events.{ItemUse, Used}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.buckshot.game.state.items.Slot
@@ -19,14 +19,18 @@ import com.zkerriga.types.{Chance, Nat}
 case class DealerUsed(item: ItemUse, on: Slot, viaAdrenaline: Option[Slot])
 
 object DealerUsed extends Logging:
-  def execute(state: GameState, used: DealerUsed): V[GameOver | Reset | GameState] =
+  def execute(state: GameState, used: DealerUsed): V[DealerWins.type | ContinuableOutcome | GameState] =
     Used
       .execute(
         state.public,
         Used(actor = Dealer, item = used.item, on = used.on, viaAdrenalineOn = used.viaAdrenaline),
       )
       .flatMap:
-        case outcome: (GameOver | Reset) => outcome.ok
+        case DealerWins => DealerWins.ok
+        case win: PlayerWins =>
+          ContinuableOutcome.WinDetails(win, updateNotes(state.hidden.dealer.notes, used).slotGroups).ok
+        case reset: Reset =>
+          ContinuableOutcome.ResetDetails(reset, updateNotes(state.hidden.dealer.notes, used).slotGroups).ok
         case table: TableState =>
           for {
             dealerKnowledge <- updateDealer(
@@ -75,18 +79,18 @@ object DealerUsed extends Logging:
         case ItemUse.Beer(out) => adjusted.update(_.afterShellOut)
         case _ => adjusted
       }
-      adjustedNotes = used.viaAdrenaline match {
-        case Some(_) => knowledge.notes
-        case None => knowledge.notes.withoutItemOn(used.on)
-      }
-      notes = used.item match {
-        case _: ItemUse.Meds => adjustedNotes.usingMeds
-        case _ => adjustedNotes
-      }
     } yield DealerKnowledge(
       belief = belief,
-      notes = notes,
+      notes = updateNotes(knowledge.notes, used),
     )
+
+  private def updateNotes(notes: DealerNotes, used: DealerUsed): DealerNotes =
+    val adjusted = used.viaAdrenaline match
+      case Some(_) => notes
+      case None => notes.withoutItemOn(used.on)
+    used.item match
+      case _: ItemUse.Meds => adjusted.usingMeds
+      case _ => adjusted
 
   private def shellAt(table: TableState, player: PlayerKnowledge, dealer: Revealed, at: SeqNr): Distribution[Shell] =
     ShellChances.shellAt(table.shotgun, player.revealed, dealer, at)

@@ -2,10 +2,10 @@ package com.zkerriga.buckshot.engine.events
 
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.{missOnGlassReveal, missOnPhoneReveal, missOnShellOut}
 import com.zkerriga.buckshot.engine.EngineError.*
-import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, PlayerKnowledge}
+import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes, PlayerKnowledge}
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
+import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
 import com.zkerriga.buckshot.game.events.{ItemUse, Used}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.buckshot.game.state.items.Slot
@@ -15,7 +15,7 @@ import com.zkerriga.types.Chance
 case class PlayerUsed(item: FullItemUse, on: Slot, viaAdrenaline: Option[Slot])
 
 object PlayerUsed:
-  def execute(state: GameState, used: PlayerUsed): V[GameOver | Reset | GameState] =
+  def execute(state: GameState, used: PlayerUsed): V[DealerWins.type | ContinuableOutcome | GameState] =
     Used
       .execute(
         state.public,
@@ -27,7 +27,11 @@ object PlayerUsed:
         ),
       )
       .flatMap:
-        case outcome: (GameOver | Reset) => outcome.ok
+        case DealerWins => DealerWins.ok
+        case win: PlayerWins =>
+          ContinuableOutcome.WinDetails(win, updateNotes(state.hidden.dealer.notes, used).slotGroups).ok
+        case reset: Reset =>
+          ContinuableOutcome.ResetDetails(reset, updateNotes(state.hidden.dealer.notes, used).slotGroups).ok
         case table: TableState =>
           for {
             dealerKnowledge <- updateDealer(state.public, table, used, state.hidden.dealer)
@@ -64,14 +68,15 @@ object PlayerUsed:
 
         case _ => knowledge.belief.ok
       }
-      notes = used.viaAdrenaline match {
-        case Some(_) => knowledge.notes.withoutItemOn(used.on)
-        case None => knowledge.notes
-      }
     } yield DealerKnowledge(
       belief = belief,
-      notes = notes,
+      notes = updateNotes(knowledge.notes, used),
     )
+
+  private def updateNotes(notes: DealerNotes, used: PlayerUsed): DealerNotes =
+    used.viaAdrenaline match
+      case Some(_) => notes.withoutItemOn(used.on)
+      case None => notes
 
   private def updatePlayer(item: FullItemUse, knowledge: PlayerKnowledge): PlayerKnowledge =
     item match

@@ -2,6 +2,7 @@ package com.zkerriga.buckshot.tui
 
 import com.googlecode.lanterna.gui2.WindowBasedTextGUI
 import com.googlecode.lanterna.gui2.dialogs.{MessageDialog, MessageDialogButton}
+import com.zkerriga.buckshot.engine.events.ContinuableOutcome
 import com.zkerriga.buckshot.game.events.outcome.Outcome.Reset
 import com.zkerriga.buckshot.game.state.partitipant.Side
 
@@ -17,7 +18,7 @@ class Dialogs(gui: WindowBasedTextGUI):
       MessageDialogButton.Close,
     )
 
-  def showReset(reset: Reset): Unit =
+  def showReset(reset: ContinuableOutcome.ResetDetails): Unit =
     MessageDialog.showMessageDialog(
       gui,
       "Shotgun Empty",
