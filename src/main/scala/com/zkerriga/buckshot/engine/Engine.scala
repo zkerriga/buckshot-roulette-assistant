@@ -2,24 +2,23 @@ package com.zkerriga.buckshot.engine
 
 import com.zkerriga.buckshot.engine.Engine.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
-import com.zkerriga.buckshot.engine.events.{DealerShot, DealerUsed, PlayerShot, PlayerUsed}
+import com.zkerriga.buckshot.engine.events.*
 import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.outcome
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
-import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
+import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.journal.AppLog.Logging
 import com.zkerriga.types.Ref
 
-class Engine(state: Ref[GameOver | Reset | GameState]):
+class Engine(state: Ref[DealerWins.type | ContinuableOutcome | GameState]):
   def getState: Either[ErrorText, GameState] =
     state.get match
-      case outcome: (GameOver | Reset) => "no state".error
+      case outcome: (DealerWins.type | ContinuableOutcome) => "no state".error
       case state: GameState => state.ok
 
   def process(event: Engine.Event): Either[ErrorText, EventReply] =
     state.modify:
-      case outcome: (GameOver | Reset) => (outcome, "game over".error)
+      case outcome: (DealerWins.type | ContinuableOutcome) => (outcome, "game over".error)
       case state: GameState =>
         log.info(s"processing event $event")
         execute(state, event) match
@@ -46,27 +45,18 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
 
           case Right(outcome) =>
             outcome match
-              case gameOver: GameOver =>
-                val winner = gameOver match
-                  case DealerWins => Dealer
-                  case PlayerWins(_, _) => Player
-                log.info(s"game is over $winner")
-                (gameOver, EventReply.GameOver(winner).ok)
-              case reset: Reset =>
+              case DealerWins =>
+                log.info("game is lost")
+                (DealerWins, EventReply.GameOver(None).ok)
+              case win: ContinuableOutcome.WinDetails =>
+                log.info(s"game is over with $win")
+                (win, EventReply.GameOver(Some(win)).ok)
+              case reset: ContinuableOutcome.ResetDetails =>
                 log.info("shotgun is resetting")
                 (reset, EventReply.ShotgunReset(reset).ok)
               case newState: GameState =>
                 log.debug(s"state chanced to $newState")
                 (newState, EventReply.NewState(newState).ok)
-
-  def continue(shells: Shotgun.ShellDistribution, dealer: Items, player: Items): Either[ErrorText, GameState] =
-    state.modify:
-      case over: GameOver => (over, "game over".error)
-      case state: GameState => (state, "in progress".error)
-      case reset: Reset =>
-        val state = ??? // todo: implement transition
-        log.info(s"state reinitialized to $state")
-        (state, state.ok)
 
   def calculateDealerPrediction(state: GameState): Distribution[DealerAi.Action] =
     state.hidden.dealer.belief.getDistribution
@@ -81,7 +71,10 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
 
 object Engine extends Logging:
   type Event = DealerShot | PlayerShot | DealerUsed | PlayerUsed
-  private def execute(state: GameState, event: Event): Either[ErrorMsg | EngineError, GameOver | Reset | GameState] =
+  private def execute(
+    state: GameState,
+    event: Event,
+  ): Either[ErrorMsg | EngineError, DealerWins.type | ContinuableOutcome | GameState] =
     event match
       case e: PlayerShot => PlayerShot.execute(state, e)
       case e: DealerShot => DealerShot.execute(state, e)
@@ -95,8 +88,8 @@ object Engine extends Logging:
 
   enum EventReply:
     case NewState(state: GameState)
-    case GameOver(winner: Side)
-    case ShotgunReset(reset: Reset)
+    case GameOver(outcome: Option[ContinuableOutcome.WinDetails])
+    case ShotgunReset(reset: ContinuableOutcome.ResetDetails)
 
   def start(state: GameState): Engine =
     log.info(s"starting engine with $state")

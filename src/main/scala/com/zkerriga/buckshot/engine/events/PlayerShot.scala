@@ -5,7 +5,7 @@ import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.state.PrivateStates.DealerKnowledge
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates}
 import com.zkerriga.buckshot.game.events.Shot
-import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
+import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.buckshot.game.state.partitipant.Side
 import com.zkerriga.buckshot.game.state.partitipant.Side.Player
@@ -15,11 +15,13 @@ import com.zkerriga.types.Chance
 case class PlayerShot(target: Side, shell: Shell)
 
 object PlayerShot:
-  def execute(state: GameState, shot: PlayerShot): V[GameOver | Reset | GameState] =
+  def execute(state: GameState, shot: PlayerShot): V[DealerWins.type | ContinuableOutcome | GameState] =
     Shot
       .execute(state.public, Shot(actor = Player, target = shot.target, shell = shot.shell))
       .flatMap:
-        case outcome: (GameOver | Reset) => outcome.ok
+        case DealerWins => DealerWins.ok
+        case win: PlayerWins => ContinuableOutcome.WinDetails(win, state.hidden.dealer.notes.slotGroups).ok
+        case reset: Reset => ContinuableOutcome.ResetDetails(reset, state.hidden.dealer.notes.slotGroups).ok
         case table: TableState =>
           for {
             dealerKnowledge <- updateDealer(old = state.public, table = table, shot, state.hidden.dealer)
