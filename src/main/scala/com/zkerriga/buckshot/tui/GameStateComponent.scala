@@ -60,9 +60,10 @@ object GameStateComponent:
       ).flatten
 
   private def items(items: Items): Component =
-    ItemGridComponent.render(items) {
-      case Some(itemOn) => Label(itemOn.item.labelName)
-      case None => Label(" ")
+    ItemGridComponent.render(items) { (itemOpt, _) =>
+      itemOpt match
+        case Some(item) => Label(item.labelName)
+        case None => Label(" ")
     }
 
   private def shotgun(shotgun: Shotgun): Panel =

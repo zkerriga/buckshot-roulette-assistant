@@ -171,7 +171,7 @@ object InputComponent:
   private def stealItemSelect(actor: Side, opponentItems: Items, shotgun: Shotgun) =
     SelectPrefix("to steal").withOptions[RegularItem, PlayerUsed | DealerUsed]:
       ???
-/*
+  /*
       opponentItems.getRegular.toVector.sortBy(_.toString).map {
         case Handcuffs =>
           HandcuffsChoice.onClickReady { _ =>
@@ -218,7 +218,7 @@ object InputComponent:
         case Meds =>
           MedsChoice.onClickNext(??? /*medsQualitySelect(actor, stolen = true)*/ )
       }
-*/
+   */
 
   private def itemSelect(actor: Side, actorItems: Items, opponentItems: Items, shotgun: Shotgun) =
     SelectPrefix().withOptions[Item, PlayerUsed | DealerUsed]:
@@ -287,4 +287,4 @@ object InputComponent:
     actor match
       case Player => PlayerUsed(item = player, stolen = stolen)
       case Dealer => DealerUsed(item = dealer, stolen = stolen)
-*/
+ */

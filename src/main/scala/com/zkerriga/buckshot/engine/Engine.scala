@@ -100,19 +100,6 @@ object Engine extends Logging:
         .deduplicate(using Eq.fromUniversalEquals) // todo: fix Eq
     }
 
-  def start(table: TableState): Engine =
-    log.info(s"starting engine with $table")
-    val state = GameState(
-      public = table,
-      hidden = PrivateStates(
-        dealer = DealerKnowledge(
-          belief = BeliefState.deterministic(Revealed.Nothing),
-          notes = DealerNotes(
-            usedMeds = false,
-            slotGroups = List(table.dealer.items.positioned.map(_.on).toSet),
-          ),
-        ),
-        player = PlayerKnowledge(Revealed.Nothing),
-      ),
-    )
+  def start(state: GameState): Engine =
+    log.info(s"starting engine with $state")
     Engine(Ref.of(state))

@@ -34,29 +34,31 @@ object DealerPredictionComponent:
     }) {
       Panel(LinearLayout(Direction.VERTICAL)).withAll(
         Label("Dealer may use:"),
-        ItemGridComponent.render(items) {
-          case Some(anyItemOn) =>
-            anyItemOn.item match {
-              case Adrenaline =>
-                val canBeUsed = possible.exists {
-                  case DealerAi.Action.Steal(_) => true
-                  case _ => false
-                }
-                if canBeUsed then Label(Adrenaline.labelName)
-                else Label(Adrenaline.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+        ItemGridComponent.render(items) { (itemOpt, slot) =>
+          itemOpt match {
+            case Some(item) =>
+              item match {
+                case Adrenaline =>
+                  val canBeUsed = possible.exists {
+                    case DealerAi.Action.Steal(_) => true
+                    case _ => false
+                  }
+                  if canBeUsed then Label(Adrenaline.labelName)
+                  else Label(Adrenaline.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
 
-              case item: RegularItem =>
-                val chanceOfUsed =
-                  possible.chanceOf(DealerAi.Action.Use(ItemOn(item, anyItemOn.on)))(using Eq.fromUniversalEquals)
-                if chanceOfUsed == Chance.NoChance then
-                  Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
-                else
-                  Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                    Label(item.labelName),
-                    ChanceLabel.render(chanceOfUsed),
-                  )
-            }
-          case _ => Label(" ")
+                case item: RegularItem =>
+                  val chanceOfUsed =
+                    possible.chanceOf(DealerAi.Action.Use(ItemOn(item, slot)))(using Eq.fromUniversalEquals)
+                  if chanceOfUsed == Chance.NoChance then
+                    Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                  else
+                    Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+                      Label(item.labelName),
+                      ChanceLabel.render(chanceOfUsed),
+                    )
+              }
+            case None => Label(" ")
+          }
         },
       )
     }
@@ -68,22 +70,25 @@ object DealerPredictionComponent:
     }) {
       Panel(LinearLayout(Direction.VERTICAL)).withAll(
         Label("Dealer may steal:"),
-        ItemGridComponent.render(items) {
-          case Some(anyItemOn) =>
-            anyItemOn.item match {
-              case Adrenaline => Label(Adrenaline.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
-              case item: RegularItem =>
-                val chanceOfStolen =
-                  possible.chanceOf(DealerAi.Action.Steal(ItemOn(item, anyItemOn.on)))(using Eq.fromUniversalEquals)
-                if chanceOfStolen == Chance.NoChance then
-                  Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
-                else
-                  Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-                    Label(item.labelName),
-                    ChanceLabel.render(chanceOfStolen),
-                  )
-            }
-          case _ => Label(" ")
+        ItemGridComponent.render(items) { (itemOpt, slot) =>
+          itemOpt match {
+            case Some(item) =>
+              item match {
+                case Adrenaline => Label(Adrenaline.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                case item: RegularItem =>
+                  val chanceOfStolen =
+                    possible.chanceOf(DealerAi.Action.Steal(ItemOn(item, slot)))(using Eq.fromUniversalEquals)
+                  if chanceOfStolen == Chance.NoChance then
+                    Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                  else
+                    Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+                      Label(item.labelName),
+                      ChanceLabel.render(chanceOfStolen),
+                    )
+              }
+            case None => Label(" ")
+          }
+
         },
       )
     }
