@@ -4,9 +4,7 @@ import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
 import com.zkerriga.buckshot.game.state.items.{Item, Slot}
 import com.zkerriga.buckshot.game.state.partitipant.Items
-import com.zkerriga.buckshot.tui.ItemGridComponent.labelName
-
-import scala.collection.View.ScanLeft
+import com.zkerriga.buckshot.tui.ItemGridComponent.{NoItem, labelName}
 
 object InputButtonsComponent:
   case class ChoiceElement[+A](
@@ -23,6 +21,13 @@ object InputButtonsComponent:
       back: Option[TextColor.ANSI] = None,
     ): ChoiceElement[A] =
       ChoiceElement(value, text, front = front, back = back)
+
+    def ofItem[I <: Item & Singleton](
+      item: I,
+      front: Option[TextColor.ANSI] = None,
+      back: Option[TextColor.ANSI] = None,
+    ): ChoiceElement[I] =
+      ChoiceElement(item, item.labelName, front = front, back = back)
 
     extension [A](choice: ChoiceElement[A])
       def onClick[R](requires: Requires[R]): Choice[A, R] = Choice(choice, requires)
@@ -131,13 +136,16 @@ object InputButtonsComponent:
 
             case Select.ChooseItem(prefix, items, choice) =>
               ItemGridComponent.render(items): (itemOpt, slot) =>
-                itemOpt.fold[Component](Label(" ")): item =>
-                  choice(item, slot) match
-                    case Some(choice) => choiceButton(choice)
-                    case None => Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                itemOpt match
+                  case Some(item) =>
+                    choice(item, slot) match
+                      case Some(choice) => choiceButton(choice)
+                      case None => Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
+                  case None => Button(NoItem, () => ())
 
-        Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
+        Panel(LinearLayout(Direction.VERTICAL)).withAll(
           mainButtons,
+          EmptySpace(),
           undoButtonComponent,
         )
 

@@ -5,7 +5,7 @@ import com.zkerriga.types.Chance
 
 object ChanceLabel:
   def renderUncertain(chance: Chance): Label =
-    Label(if chance == Chance.Certain then "" else chance.show)
+    Label(if chance == Chance.Certain then "" else chance.show(6))
 
   def render(chance: Chance): Label =
-    Label(chance.show)
+    Label(chance.show(2))

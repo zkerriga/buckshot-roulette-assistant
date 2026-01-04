@@ -19,6 +19,8 @@ object DealerAi:
     case Use(item: ItemOn)
     case Steal(item: ItemOn)
     case Shoot(target: Side)
+  object Action:
+    given Eq[Action] = Eq.fromUniversalEquals
 
   enum NextShell:
     case Unknown

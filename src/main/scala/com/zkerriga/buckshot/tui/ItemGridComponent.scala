@@ -1,25 +1,31 @@
 package com.zkerriga.buckshot.tui
 
 import com.googlecode.lanterna.gui2.*
-import com.googlecode.lanterna.gui2.GridLayout.{Alignment, createLayoutData}
 import com.zkerriga.buckshot.game.all.*
 
 object ItemGridComponent:
   def render[A](items: Items)(renderer: (Option[Item], Slot) => Component): Panel = {
-    def gridOf(slots: Seq[Slot]): Panel =
+    def gridOf(topLeft: Slot, topRight: Slot, bottomLeft: Slot, bottonRight: Slot) =
       import GridLayout.*
-      Panel(GridLayout(2)).withSeq(
-        slots.map { slot =>
-          renderer(items.on(slot), slot)
-            .setLayoutData(createLayoutData(Alignment.CENTER, Alignment.CENTER))
-            .withBorder(Borders.singleLine())
-        },
-      )
+      def renderSlot(slot: Slot) = renderer(items.on(slot), slot)
+      Panel(GridLayout(3))
+        .withAll(
+          renderSlot(topLeft),
+          Separator(Direction.VERTICAL),
+          renderSlot(topRight),
+          Separator(Direction.HORIZONTAL).setLayoutData(createHorizontallyFilledLayoutData()),
+          Separator(Direction.VERTICAL),
+          Separator(Direction.HORIZONTAL).setLayoutData(createHorizontallyFilledLayoutData()),
+          renderSlot(bottomLeft),
+          Separator(Direction.VERTICAL),
+          renderSlot(bottonRight),
+        )
+        .withBorder(Borders.singleLine())
 
     Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
-      gridOf(Seq(Slot1, Slot2, Slot3, Slot4)),
+      gridOf(Slot1, Slot2, Slot3, Slot4),
       EmptySpace(),
-      gridOf(Seq(Slot5, Slot6, Slot7, Slot8)),
+      gridOf(Slot5, Slot6, Slot7, Slot8),
     )
   }
 
@@ -27,12 +33,14 @@ object ItemGridComponent:
     def labelName: String =
       item match {
         case Adrenaline => "Adrenaline"
-        case Handcuffs => "Handcuffs"
-        case MagnifyingGlass => "Magnifying Glass"
-        case Beer => "Beer"
+        case Handcuffs => "Handcuffs "
+        case MagnifyingGlass => "Mag Glass "
+        case Beer => "Beer      "
         case Cigarettes => "Cigarettes"
-        case Saw => "Saw"
-        case Inverter => "Inverter"
-        case BurnerPhone => "BurnerPhone"
-        case Meds => "Meds"
+        case Saw => "Saw       "
+        case Inverter => "Inverter  "
+        case BurnerPhone => "Burn Phone"
+        case Meds => "Meds      "
       }
+
+  val NoItem: String = "        "

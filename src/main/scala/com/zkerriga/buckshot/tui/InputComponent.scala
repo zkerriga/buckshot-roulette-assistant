@@ -3,8 +3,8 @@ package com.zkerriga.buckshot.tui
 import cats.syntax.all.*
 import com.googlecode.lanterna.TextColor.ANSI
 import com.googlecode.lanterna.gui2.Component
-import com.zkerriga.buckshot.engine.events.{PlayerUsed, PlayerShot, DealerShot, DealerUsed, FullItemUse}
 import com.zkerriga.buckshot.engine.Engine.Event
+import com.zkerriga.buckshot.engine.events.*
 import com.zkerriga.buckshot.game.accessors.Opposition
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.ItemUse
@@ -26,7 +26,8 @@ object InputComponent:
     val opponentItems = game.opponent.items
 
     def cannotUseAnyItem: Boolean =
-      actorItems.positioned.isEmpty || (actorItems.containAdrenaline && opponentItems.positioned.isEmpty)
+      if actorItems.containAdrenaline then actorItems.positioned.isEmpty && opponentItems.positioned.isEmpty
+      else actorItems.positioned.isEmpty
 
     val initial: InputState[Event] =
       if cannotUseAnyItem then
@@ -63,15 +64,15 @@ object InputComponent:
   private val ShotChoice = ChoiceElement.of(EventType.Shot, "shot")
   private val UsedChoice = ChoiceElement.of(EventType.Used, "used")
 
-  private val AdrenalineChoice = ChoiceElement.of(Adrenaline, "Adrenaline", front = ANSI.GREEN)
-  private val HandcuffsChoice = ChoiceElement.of(Handcuffs, "Handcuffs", front = ANSI.YELLOW)
-  private val MagnifyingGlassChoice = ChoiceElement.of(MagnifyingGlass, "Magnifying Glass", front = ANSI.YELLOW)
-  private val BeerChoice = ChoiceElement.of(Beer, "Beer", front = ANSI.YELLOW)
-  private val CigarettesChoice = ChoiceElement.of(Cigarettes, "Cigarettes", front = ANSI.YELLOW)
-  private val SawChoice = ChoiceElement.of(Saw, "Saw", front = ANSI.YELLOW)
-  private val InverterChoice = ChoiceElement.of(Inverter, "Inverter", front = ANSI.YELLOW)
-  private val BurnerPhoneChoice = ChoiceElement.of(BurnerPhone, "Burner Phone", front = ANSI.YELLOW)
-  private val MedsChoice = ChoiceElement.of(Meds, "Meds", front = ANSI.YELLOW)
+  private val AdrenalineChoice = ChoiceElement.ofItem(Adrenaline, front = ANSI.GREEN)
+  private val HandcuffsChoice = ChoiceElement.ofItem(Handcuffs, front = ANSI.YELLOW)
+  private val MagnifyingGlassChoice = ChoiceElement.ofItem(MagnifyingGlass, front = ANSI.YELLOW)
+  private val BeerChoice = ChoiceElement.ofItem(Beer, front = ANSI.YELLOW)
+  private val CigarettesChoice = ChoiceElement.ofItem(Cigarettes, front = ANSI.YELLOW)
+  private val SawChoice = ChoiceElement.ofItem(Saw, front = ANSI.YELLOW)
+  private val InverterChoice = ChoiceElement.ofItem(Inverter, front = ANSI.YELLOW)
+  private val BurnerPhoneChoice = ChoiceElement.ofItem(BurnerPhone, front = ANSI.YELLOW)
+  private val MedsChoice = ChoiceElement.ofItem(Meds, front = ANSI.YELLOW)
 
   private enum MedsQuality:
     case Good, Bad
@@ -80,13 +81,13 @@ object InputComponent:
   private val BadMedsChoice = ChoiceElement.of(MedsQuality.Bad, "Bad", front = ANSI.CYAN)
 
   private val NoShellChoice = ChoiceElement.of(None, "nothing")
-  private val Shell2Choice = ChoiceElement.of(Shell2, "2d shell")
-  private val Shell3Choice = ChoiceElement.of(Shell3, "3d shell")
-  private val Shell4Choice = ChoiceElement.of(Shell4, "4th shell")
-  private val Shell5Choice = ChoiceElement.of(Shell5, "5th shell")
-  private val Shell6Choice = ChoiceElement.of(Shell6, "6th shell")
-  private val Shell7Choice = ChoiceElement.of(Shell7, "7th shell")
-  private val Shell8Choice = ChoiceElement.of(Shell8, "8th shell")
+  private val Shell2Choice = ChoiceElement.of(Shell2, "2-d shell")
+  private val Shell3Choice = ChoiceElement.of(Shell3, "3-d shell")
+  private val Shell4Choice = ChoiceElement.of(Shell4, "4-th shell")
+  private val Shell5Choice = ChoiceElement.of(Shell5, "5-th shell")
+  private val Shell6Choice = ChoiceElement.of(Shell6, "6-th shell")
+  private val Shell7Choice = ChoiceElement.of(Shell7, "7-th shell")
+  private val Shell8Choice = ChoiceElement.of(Shell8, "8-th shell")
 
   private def shotShellSelect(actor: Side, target: Side) =
     SelectPrefix("with").withOptions:

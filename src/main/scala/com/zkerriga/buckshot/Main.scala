@@ -8,6 +8,8 @@ import com.zkerriga.buckshot.tui.{ColorScheme, Dialogs, GameWindow, NewGameWindo
 import com.zkerriga.types.Ref
 
 object Main extends Logging:
+  private inline val DebugGameView = false
+
   def main(args: Array[String]): Unit =
     val screen = DefaultTerminalFactory()
       .setPreferTerminalEmulator(false)
@@ -21,12 +23,15 @@ object Main extends Logging:
 
     try {
       val engine: Ref[Option[Engine]] = Ref.of(None)
-      log.trace("starting new game window")
-      val newGameWindow = NewGameWindow.window: state =>
-        engine.set(Some(Engine.start(state)))
 
-      textGUI.addWindowAndWait(newGameWindow)
-      log.trace("setup window closed")
+      if DebugGameView then engine.set(Some(Engine.start(TestState.state)))
+      else
+        log.trace("starting new game window")
+        val newGameWindow = NewGameWindow.window: state =>
+          engine.set(Some(Engine.start(state)))
+        textGUI.addWindowAndWait(newGameWindow)
+        log.trace("setup window closed")
+
       engine.get match
         case None => () // quit
         case Some(engine) =>

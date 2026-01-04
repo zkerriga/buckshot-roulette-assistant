@@ -1,9 +1,13 @@
 package com.zkerriga.buckshot.game.state.shotgun
 
+import cats.Eq
+
 enum Shell:
   case Live, Blank
 
 object Shell:
+  given Eq[Shell] = Eq.fromUniversalEquals
+
   extension (shell: Shell)
     def inverted: Shell = shell match
       case Live => Blank

@@ -9,7 +9,7 @@ import com.zkerriga.buckshot.game
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.shotgun.Shell
-import com.zkerriga.buckshot.tui.ItemGridComponent.labelName
+import com.zkerriga.buckshot.tui.ItemGridComponent.{NoItem, labelName}
 import com.zkerriga.types.Chance
 
 object GameStateComponent:
@@ -63,7 +63,7 @@ object GameStateComponent:
     ItemGridComponent.render(items) { (itemOpt, _) =>
       itemOpt match
         case Some(item) => Label(item.labelName)
-        case None => Label(" ")
+        case None => Label(NoItem)
     }
 
   private def shotgun(shotgun: Shotgun): Panel =
@@ -87,7 +87,7 @@ object GameStateComponent:
       revealed(known, shotgun).setLayoutData(createLayoutData(Alignment.BEGINNING, Alignment.CENTER)),
       EmptySpace().setLayoutData(createHorizontallyFilledLayoutData()),
       hands(participant.hands).setLayoutData(createLayoutData(Alignment.END, Alignment.CENTER)),
-      health(participant.health, max).setLayoutData(createLayoutData(Alignment.END, Alignment.CENTER)),
+      health(participant.health, max).setLayoutData(createLayoutData(Alignment.END, Alignment.END)),
     )
 
   private def hands(hands: Hands): Label =

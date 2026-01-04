@@ -1,13 +1,12 @@
 package com.zkerriga.buckshot.engine.events
 
-import cats.Eq
 import cats.data.NonEmptySeq
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
-import com.zkerriga.buckshot.engine.Distribution
 import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes, PlayerKnowledge}
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
+import com.zkerriga.buckshot.engine.{Distribution, ShellChances}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
 import com.zkerriga.buckshot.game.events.{ItemUse, Used}
@@ -90,20 +89,7 @@ object DealerUsed extends Logging:
     )
 
   private def shellAt(table: TableState, player: PlayerKnowledge, dealer: Revealed, at: SeqNr): Distribution[Shell] =
-    val common: Revealed = player.revealed.combineWith(dealer)
-    common.get(at) match
-      case Some(alreadyKnown) => Distribution.deterministic(alreadyKnown)
-      case None =>
-        table.shotgun.live
-          .minus(common.count(Live))
-          .fold(Distribution.deterministic(Blank)): live =>
-            table.shotgun.blank
-              .minus(common.count(Blank))
-              .fold(Distribution.deterministic(Live)): blank =>
-                Distribution.weighted(
-                  live -> Live,
-                  blank -> Blank,
-                )
+    ShellChances.shellAt(table.shotgun, player.revealed, dealer, at)
 
   private def condition(old: TableState, oldNotes: DealerNotes, table: TableState, used: DealerUsed)(
     revealed: Revealed,
@@ -120,7 +106,7 @@ object DealerUsed extends Logging:
         case None => DealerAi.Action.Use(itemOn)
       }
       val prediction = DealerAi.next(old, oldNotes, revealed)
-      prediction.chanceOf(realAction)(using Eq.fromUniversalEquals) // todo: fix Eq
+      prediction.chanceOf(realAction)
     }
 
   private def updatePlayer(item: ItemUse, knowledge: PlayerKnowledge): PlayerKnowledge =

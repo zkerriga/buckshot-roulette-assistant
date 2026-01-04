@@ -1,31 +1,30 @@
 package com.zkerriga.buckshot.tui
 
-import cats.Eq
 import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
-import com.zkerriga.buckshot.engine.Distribution
-import com.zkerriga.buckshot.engine.Engine.DealerPrediction
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.ai.DealerAi.Action
+import com.zkerriga.buckshot.engine.state.GameState
+import com.zkerriga.buckshot.engine.{Distribution, Engine}
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.state.items.Slot.Slot1
-import com.zkerriga.buckshot.tui.ItemGridComponent.labelName
+import com.zkerriga.buckshot.tui.ItemGridComponent.{NoItem, labelName}
 import com.zkerriga.types.Chance
 
 object DealerPredictionComponent:
-  def render(table: TableState, actions: Option[DealerPrediction]): Component =
-    actions match
-      case Some(actions) =>
-        Panel(LinearLayout(Direction.VERTICAL))
+  def render(state: GameState, engine: Engine): Component =
+    state.turn match
+      case Player => Panel()
+      case Dealer =>
+        val prediction = engine.calculateDealerPrediction(state)
+        Panel(GridLayout(1))
           .withSeq(
             Seq(
-              dealerMayUse(table.dealer.items, actions.possible),
-              dealerMaySteal(table.player.items, actions.possible),
-              dealerMayShoot(actions.possible),
+              dealerMayUse(state.dealer.items, prediction),
+              dealerMaySteal(state.player.items, prediction),
+              dealerMayShoot(prediction),
             ).flatten,
           )
-          .withBorder(Borders.singleLine("Dealer Prediction"))
-      case None => Panel()
+          .withBorder(Borders.singleLine("Prediction"))
 
   private def dealerMayUse(items: Items, possible: Distribution[DealerAi.Action]): Option[Component] =
     Option.when(possible.exists {
@@ -48,7 +47,7 @@ object DealerPredictionComponent:
 
                 case item: RegularItem =>
                   val chanceOfUsed =
-                    possible.chanceOf(DealerAi.Action.Use(ItemOn(item, slot)))(using Eq.fromUniversalEquals)
+                    possible.chanceOf(DealerAi.Action.Use(ItemOn(item, slot)))
                   if chanceOfUsed == Chance.NoChance then
                     Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
                   else
@@ -57,7 +56,7 @@ object DealerPredictionComponent:
                       ChanceLabel.render(chanceOfUsed),
                     )
               }
-            case None => Label(" ")
+            case None => Label(NoItem)
           }
         },
       )
@@ -77,7 +76,7 @@ object DealerPredictionComponent:
                 case Adrenaline => Label(Adrenaline.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
                 case item: RegularItem =>
                   val chanceOfStolen =
-                    possible.chanceOf(DealerAi.Action.Steal(ItemOn(item, slot)))(using Eq.fromUniversalEquals)
+                    possible.chanceOf(DealerAi.Action.Steal(ItemOn(item, slot)))
                   if chanceOfStolen == Chance.NoChance then
                     Label(item.labelName).setForegroundColor(TextColor.ANSI.BLACK_BRIGHT)
                   else
@@ -86,7 +85,7 @@ object DealerPredictionComponent:
                       ChanceLabel.render(chanceOfStolen),
                     )
               }
-            case None => Label(" ")
+            case None => Label(NoItem)
           }
 
         },
@@ -99,7 +98,7 @@ object DealerPredictionComponent:
       case _ => false
     }) {
       def target(side: Side): Option[Component] = {
-        val chance = possible.chanceOf(DealerAi.Action.Shoot(side))(using Eq.fromUniversalEquals)
+        val chance = possible.chanceOf(DealerAi.Action.Shoot(side))
         Option.unless(chance == Chance.NoChance) {
           Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
             Label(side.toString),

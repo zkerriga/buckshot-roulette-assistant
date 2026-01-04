@@ -53,5 +53,5 @@ object DealerShot:
     else {
       val realAction = DealerAi.Action.Shoot(shot.target)
       val prediction = DealerAi.next(old, oldNotes, revealed)
-      prediction.chanceOf(realAction)(using Eq.fromUniversalEquals) // todo: fix Eq
+      prediction.chanceOf(realAction)
     }

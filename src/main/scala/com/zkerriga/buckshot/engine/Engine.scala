@@ -1,17 +1,15 @@
 package com.zkerriga.buckshot.engine
 
-import cats.Eq
 import com.zkerriga.buckshot.engine.Engine.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.events.{DealerShot, DealerUsed, PlayerShot, PlayerUsed}
-import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes, PlayerKnowledge}
-import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
+import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.all.*
+import com.zkerriga.buckshot.game.events.outcome
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
-import com.zkerriga.buckshot.game.events.{Shot, Used, outcome}
 import com.zkerriga.buckshot.journal.AppLog.Logging
-import com.zkerriga.types.{Nat, Ref}
+import com.zkerriga.types.Ref
 
 class Engine(state: Ref[GameOver | Reset | GameState]):
   def getState: Either[ErrorText, GameState] =
@@ -59,10 +57,7 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
                 (reset, EventReply.ShotgunReset(reset).ok)
               case newState: GameState =>
                 log.debug(s"state chanced to $newState")
-                val dealerPrediction =
-                  Option.when(newState.turn == Dealer):
-                    DealerPrediction.on(newState)
-                (newState, EventReply.NewState(newState, dealer = dealerPrediction).ok)
+                (newState, EventReply.NewState(newState).ok)
 
   def continue(shells: Shotgun.ShellDistribution, dealer: Items, player: Items): Either[ErrorText, GameState] =
     state.modify:
@@ -72,6 +67,17 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
         val state = ??? // todo: implement transition
         log.info(s"state reinitialized to $state")
         (state, state.ok)
+
+  def calculateDealerPrediction(state: GameState): Distribution[DealerAi.Action] =
+    state.hidden.dealer.belief.getDistribution
+      .flatMap(DealerAi.next(state.public, state.hidden.dealer.notes, _)) // todo: add cache
+      .deduplicate
+
+  def calculateShellsChances(state: GameState): Seq[(SeqNr, Distribution[Shell])] =
+    SeqNr.values.toSeq.take(state.shotgun.total).map { seqNr =>
+      val distribution = ShellChances.consideringEverything(state, seqNr)
+      seqNr -> distribution
+    }
 
 object Engine extends Logging:
   type Event = DealerShot | PlayerShot | DealerUsed | PlayerUsed
@@ -88,17 +94,9 @@ object Engine extends Logging:
   extension [A](value: A) private[Engine] def ok = Right(value)
 
   enum EventReply:
-    case NewState(state: GameState, dealer: Option[DealerPrediction])
+    case NewState(state: GameState)
     case GameOver(winner: Side)
     case ShotgunReset(reset: Reset)
-
-  case class DealerPrediction(possible: Distribution[DealerAi.Action])
-  object DealerPrediction:
-    def on(state: GameState): DealerPrediction = DealerPrediction {
-      state.hidden.dealer.belief.getDistribution
-        .flatMap(DealerAi.next(state.public, state.hidden.dealer.notes, _)) // todo: add cache
-        .deduplicate(using Eq.fromUniversalEquals) // todo: fix Eq
-    }
 
   def start(state: GameState): Engine =
     log.info(s"starting engine with $state")
