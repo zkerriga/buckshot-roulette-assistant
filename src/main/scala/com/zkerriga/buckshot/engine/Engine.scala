@@ -4,7 +4,8 @@ import cats.Eq
 import com.zkerriga.buckshot.engine.Engine.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.events.{DealerShot, DealerUsed, PlayerShot, PlayerUsed}
-import com.zkerriga.buckshot.engine.state.GameState
+import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes, PlayerKnowledge}
+import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
@@ -22,6 +23,7 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
     state.modify:
       case outcome: (GameOver | Reset) => (outcome, "game over".error)
       case state: GameState =>
+        log.info(s"processing event $event")
         execute(state, event) match
           case Left(error) =>
             error match
@@ -34,9 +36,9 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
               case ErrorMsg.ShotgunStateMismatch =>
                 log.error(s"shotgun state mismatch, while processing $event on $state")
                 (state, "critical issue".error)
-              case ErrorMsg.MissingItem(item) =>
-                log.warn(s"missing item $item for $event on $state")
-                (state, s"missing item $item".error)
+              case ErrorMsg.MissingItem =>
+                log.warn(s"missing item for $event on $state")
+                (state, s"missing item".error)
               case ErrorMsg.SawAlreadyUsed =>
                 log.warn(s"saw already used for $event on $state")
                 (state, "saw already used".error)
@@ -59,7 +61,7 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
                 log.debug(s"state chanced to $newState")
                 val dealerPrediction =
                   Option.when(newState.turn == Dealer):
-                    DealerPrediction.from(newState)
+                    DealerPrediction.on(newState)
                 (newState, EventReply.NewState(newState, dealer = dealerPrediction).ok)
 
   def continue(shells: Shotgun.ShellDistribution, dealer: Items, player: Items): Either[ErrorText, GameState] =
@@ -67,26 +69,18 @@ class Engine(state: Ref[GameOver | Reset | GameState]):
       case over: GameOver => (over, "game over".error)
       case state: GameState => (state, "in progress".error)
       case reset: Reset =>
-        val state = GameState.initial(TableState.from(reset, shells, dealer = dealer, player = player))
+        val state = ???
         log.info(s"state reinitialized to $state")
         (state, state.ok)
 
 object Engine extends Logging:
-  type Event = Shot[Side] | Used[Dealer.type] | PlayerUsed
+  type Event = DealerShot | PlayerShot | DealerUsed | PlayerUsed
   private def execute(state: GameState, event: Event): Either[ErrorMsg | EngineError, GameOver | Reset | GameState] =
     event match
-      case Shot(Player, target, shell) =>
-        log.info(s"player shot $target with $shell")
-        PlayerShot.execute(state, Shot(Player, target, shell))
-      case Shot(Dealer, target, shell) =>
-        log.info(s"dealer shot $target with $shell")
-        DealerShot.execute(state, Shot(Dealer, target, shell))
-      case used @ Used(Dealer, item, steal) =>
-        log.info(s"dealer used $item $steal")
-        DealerUsed.execute(state, used)
-      case used @ PlayerUsed(item, steal) =>
-        log.info(s"player used $item $steal")
-        PlayerUsed.execute(state, used)
+      case e: PlayerShot => PlayerShot.execute(state, e)
+      case e: DealerShot => DealerShot.execute(state, e)
+      case e: DealerUsed => DealerUsed.execute(state, e)
+      case e: PlayerUsed => PlayerUsed.execute(state, e)
 
   type ErrorText = String
 
@@ -98,33 +92,27 @@ object Engine extends Logging:
     case GameOver(winner: Side)
     case ShotgunReset(reset: Reset)
 
-  enum Action:
-    case Shoot(target: Side)
-    case Use(item: RegularItem, steal: Boolean)
-  object Action:
-    given Eq[Action] = Eq.fromUniversalEquals
-
-  case class DealerPrediction(actions: Distribution[Action])
+  case class DealerPrediction(possible: Distribution[DealerAi.Action])
   object DealerPrediction:
-    def from(game: GameState): DealerPrediction = DealerPrediction {
-      game.knowledge.dealer.getDistribution.flatMap { revealed =>
-        DealerAi.next(game.public, revealed) match {
-          case DealerAi.Action.Use(item, steal) => Distribution.deterministic(Action.Use(item, steal))
-          case DealerAi.Action.Shoot(target) => Distribution.deterministic(Action.Shoot(target))
-          case DealerAi.Action.Guess(live, blank) =>
-            Distribution.weighted(
-              Nat[1] -> (live match {
-                case DealerAi.Action.Use(Saw, false) => Action.Use(Saw, steal = false)
-                case DealerAi.Action.Shoot(Player) => Action.Shoot(Player)
-              }),
-              Nat[1] -> (blank match {
-                case DealerAi.Action.Shoot(Dealer) => Action.Shoot(Dealer)
-              }),
-            )
-        }
-      }.deduplicate
+    def on(state: GameState): DealerPrediction = DealerPrediction {
+      state.hidden.dealer.belief.getDistribution
+        .flatMap(DealerAi.next(state.public, state.hidden.dealer.notes, _)) // todo: add cache
+        .deduplicate(using Eq.fromUniversalEquals) // todo: fix Eq
     }
 
   def start(table: TableState): Engine =
     log.info(s"starting engine with $table")
-    Engine(Ref.of(GameState.initial(table)))
+    val state = GameState(
+      public = table,
+      hidden = PrivateStates(
+        dealer = DealerKnowledge(
+          belief = BeliefState.deterministic(Revealed.Nothing),
+          notes = DealerNotes(
+            usedMeds = false,
+            slotGroups = List(table.dealer.items.positioned.map(_.on).toSet),
+          ),
+        ),
+        player = PlayerKnowledge(Revealed.Nothing),
+      ),
+    )
+    Engine(Ref.of(state))

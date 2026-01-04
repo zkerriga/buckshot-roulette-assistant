@@ -2,8 +2,8 @@ package com.zkerriga.buckshot.game.state.partitipant
 
 import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
 import com.zkerriga.buckshot.game.state.HealthLimit
-import com.zkerriga.buckshot.game.state.items.Item
-import com.zkerriga.buckshot.game.state.shotgun.{SeqNr, Shell}
+import com.zkerriga.buckshot.game.state.items.{RegularItem, Slot}
+import com.zkerriga.buckshot.game.state.partitipant.Items.ItemOn
 
 case class Participant(
   health: Health,
@@ -13,11 +13,16 @@ case class Participant(
 
 object Participant:
   extension (participant: Participant)
-    def without(item: Item): V[Participant] =
-      participant.items
-        .removed(item)
-        .map: updated =>
-          participant.copy(items = updated)
+    def without(item: ItemOn): Participant =
+      participant.copy(items = participant.items.without(item))
+
+    def withoutAdrenaline(on: Slot): Participant =
+      participant.copy(items = participant.items.withoutAdrenaline(on))
+
+    def has(item: RegularItem): Boolean =
+      participant.items.contain(item)
+    def hasAdrenaline: Boolean =
+      participant.items.containAdrenaline
 
     def damaged(by: Damage): Option[Participant] =
       participant.health
@@ -34,6 +39,3 @@ object Participant:
 
     def afterTurn: Participant =
       participant.copy(hands = participant.hands.afterTurn)
-
-    infix def has(item: Item): Boolean = participant.items.contain(item)
-    infix def hasNo(item: Item): Boolean = !has(item)

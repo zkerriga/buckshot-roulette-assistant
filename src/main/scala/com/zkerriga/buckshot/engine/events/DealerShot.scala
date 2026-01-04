@@ -1,40 +1,57 @@
 package com.zkerriga.buckshot.engine.events
 
-import com.zkerriga.buckshot.engine.BeliefState
+import cats.Eq
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
 import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
-import com.zkerriga.buckshot.engine.ai.DealerAi.Action
-import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
+import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes}
+import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Shot
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.types.Chance
 
+case class DealerShot(target: Side, shell: Shell)
+
 object DealerShot:
-  def execute(state: GameState, shot: Shot[Dealer.type]): V[GameOver | Reset | GameState] =
+  def execute(state: GameState, shot: DealerShot): V[GameOver | Reset | GameState] =
     Shot
-      .execute(state.public, shot)
+      .execute(state.public, Shot(actor = Dealer, target = shot.target, shell = shot.shell))
       .flatMap:
         case outcome: (GameOver | Reset) => outcome.ok
         case table: TableState =>
-          for adjustedDealerKnowledge <- state.knowledge.dealer.conditioning(condition(state, table, shot))
-          yield GameState(
+          for {
+            dealerKnowledge <- updateDealer(old = state.public, table = table, shot, state.hidden.dealer)
+          } yield GameState(
             public = table,
-            knowledge = Knowledge(
-              dealer = adjustedDealerKnowledge.update(_.afterShellOut),
-              player = state.knowledge.player.afterShellOut,
+            hidden = PrivateStates(
+              dealer = dealerKnowledge,
+              player = state.hidden.player.afterShellOut,
             ),
           )
 
-  private def condition(oldState: GameState, table: TableState, shot: Shot[Dealer.type])(revealed: Revealed): Chance =
-    if missOnShellOut(revealed, old = oldState.shotgun, updated = table.shotgun, out = shot.shell) then Chance.NoChance
-    else
-      DealerAi.next(oldState.public, revealed) match
-        case Action.Use(_, _) => Chance.NoChance
-        case Action.Shoot(target) => Chance.certainWhen(target == shot.target)
-        case Action.Guess(live, Action.Shoot(Dealer)) =>
-          val ifGuessedBlank = Chance.certainWhen(shot.target == Dealer)
-          val ifGuessedLive = Chance.certainWhen(live == Action.Shoot(Player) && shot.target == Player)
-          (ifGuessedBlank and Chance.CoinFlip) or (ifGuessedLive and Chance.CoinFlip)
+  private def updateDealer(
+    old: TableState,
+    table: TableState,
+    shot: DealerShot,
+    knowledge: DealerKnowledge,
+  ): V[DealerKnowledge] =
+    for {
+      adjustedBelief <- knowledge.belief.conditioning(
+        condition(old = old, oldNotes = knowledge.notes, table = table, shot),
+      )
+    } yield DealerKnowledge(
+      belief = adjustedBelief.update(_.afterShellOut),
+      notes = knowledge.notes.copy(usedMeds = false),
+    )
+
+  private def condition(old: TableState, oldNotes: DealerNotes, table: TableState, shot: DealerShot)(
+    revealed: Revealed,
+  ): Chance =
+    if missOnShellOut(revealed, old = old.shotgun, updated = table.shotgun, out = shot.shell) then Chance.NoChance
+    else {
+      val realAction = DealerAi.Action.Shoot(shot.target)
+      val prediction = DealerAi.next(old, oldNotes, revealed)
+      prediction.chanceOf(realAction)(using Eq.fromUniversalEquals) // todo: fix Eq
+    }

@@ -1,83 +1,83 @@
 package com.zkerriga.buckshot.engine.events
 
-import com.zkerriga.buckshot.engine.BeliefState
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.{missOnGlassReveal, missOnPhoneReveal, missOnShellOut}
 import com.zkerriga.buckshot.engine.EngineError.*
-import com.zkerriga.buckshot.engine.events.PlayerUsed.ItemUse
-import com.zkerriga.buckshot.engine.state.{GameState, Knowledge, Revealed}
+import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, PlayerKnowledge}
+import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.Used
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{GameOver, Reset}
+import com.zkerriga.buckshot.game.events.{ItemUse, Used}
 import com.zkerriga.buckshot.game.state.TableState
+import com.zkerriga.buckshot.game.state.items.Slot
 import com.zkerriga.buckshot.game.state.partitipant.Side.Player
 import com.zkerriga.types.Chance
 
-case class PlayerUsed(item: ItemUse, stolen: Boolean)
+case class PlayerUsed(item: FullItemUse, on: Slot, viaAdrenaline: Option[Slot])
 
 object PlayerUsed:
-  enum ItemUse:
-    case Handcuffs
-    case MagnifyingGlass(revealed: Shell)
-    case Beer(out: Shell)
-    case Cigarettes
-    case Saw
-    case Inverter
-    case BurnerPhone(revealed: Option[(revealed: Shell, at: SeqNr)])
-    case Meds(good: Boolean)
-
   def execute(state: GameState, used: PlayerUsed): V[GameOver | Reset | GameState] =
     Used
-      .execute(state.public, Used(Player, ItemUse.asPublic(used.item), used.stolen))
+      .execute(
+        state.public,
+        Used(
+          actor = Player,
+          item = used.item.toPublic,
+          on = used.on,
+          viaAdrenalineOn = used.viaAdrenaline,
+        ),
+      )
       .flatMap:
         case outcome: (GameOver | Reset) => outcome.ok
         case table: TableState =>
-          for dealerKnowledge <- updateDealerKnowledge(state, table, used.item)(state.knowledge.dealer)
-          yield GameState(
+          for {
+            dealerKnowledge <- updateDealer(state.public, table, used, state.hidden.dealer)
+          } yield GameState(
             public = table,
-            knowledge = Knowledge(
+            hidden = PrivateStates(
               dealer = dealerKnowledge,
-              player = updatePlayerKnowledge(state.knowledge.player, used.item),
+              player = updatePlayer(used.item, state.hidden.player),
             ),
           )
 
-  private def updatePlayerKnowledge(knowledge: Revealed, item: ItemUse): Revealed =
-    item match
-      case ItemUse.MagnifyingGlass(revealed) => knowledge.revealed(revealed, Shell1)
-      case ItemUse.BurnerPhone(revealed) =>
-        revealed.fold(knowledge): (revealed, at) =>
-          knowledge.revealed(revealed, at)
-      case ItemUse.Beer(out) => knowledge.afterShellOut
-      case _ => knowledge
-
-  private def updateDealerKnowledge(
-    oldState: GameState,
+  private def updateDealer(
+    old: TableState,
     table: TableState,
-    item: ItemUse,
-  )(belief: BeliefState[Revealed]): V[BeliefState[Revealed]] =
+    used: PlayerUsed,
+    knowledge: DealerKnowledge,
+  ): V[DealerKnowledge] =
+    for {
+      belief <- used.item match {
+        case FullItemUse.MagnifyingGlass(shell) =>
+          knowledge.belief.conditioning: revealed =>
+            Chance.certainUnless(missOnGlassReveal(revealed, table.shotgun, shell))
+
+        case FullItemUse.BurnerPhone(revealed) =>
+          revealed.fold(knowledge.belief.ok): (shell, at) =>
+            knowledge.belief.conditioning: revealed =>
+              Chance.certainUnless(missOnPhoneReveal(revealed, table.shotgun, shell, at))
+
+        case FullItemUse.Beer(out) =>
+          knowledge.belief
+            .conditioning: revealed =>
+              Chance.certainUnless(missOnShellOut(revealed, old = old.shotgun, updated = table.shotgun, out = out))
+            .map(_.update(_.afterShellOut))
+
+        case _ => knowledge.belief.ok
+      }
+      notes = used.viaAdrenaline match {
+        case Some(_) => knowledge.notes.withoutItemOn(used.on)
+        case None => knowledge.notes
+      }
+    } yield DealerKnowledge(
+      belief = belief,
+      notes = notes,
+    )
+
+  private def updatePlayer(item: FullItemUse, knowledge: PlayerKnowledge): PlayerKnowledge =
     item match
-      case ItemUse.MagnifyingGlass(revealed) =>
-        belief.conditioning: knowledge =>
-          Chance.certainUnless(missOnGlassReveal(knowledge, table.shotgun, revealed))
-
-      case ItemUse.BurnerPhone(revealed) =>
-        revealed.fold(belief.ok): (revealed, at) =>
-          belief.conditioning: knowledge =>
-            Chance.certainUnless(missOnPhoneReveal(knowledge, table.shotgun, revealed, at))
-
-      case ItemUse.Beer(out) =>
-        for adjusted <- belief.conditioning: knowledge =>
-            Chance.certainUnless(missOnShellOut(knowledge, old = oldState.shotgun, updated = table.shotgun, out = out))
-        yield adjusted.update(_.afterShellOut)
-
-      case _ => belief.ok
-
-  object ItemUse:
-    private[PlayerUsed] val asPublic: ItemUse => Used.ItemUse =
-      case ItemUse.Handcuffs => Used.ItemUse.Handcuffs
-      case ItemUse.MagnifyingGlass(_) => Used.ItemUse.MagnifyingGlass
-      case ItemUse.Beer(out) => Used.ItemUse.Beer(out)
-      case ItemUse.Cigarettes => Used.ItemUse.Cigarettes
-      case ItemUse.Saw => Used.ItemUse.Saw
-      case ItemUse.Inverter => Used.ItemUse.Inverter
-      case ItemUse.BurnerPhone(_) => Used.ItemUse.BurnerPhone
-      case ItemUse.Meds(good) => Used.ItemUse.Meds(good)
+      case FullItemUse.MagnifyingGlass(revealed) => knowledge.knowing(revealed, Shell1)
+      case FullItemUse.BurnerPhone(revealed) =>
+        revealed.fold(knowledge): (revealed, at) =>
+          knowledge.knowing(revealed, at)
+      case FullItemUse.Beer(out) => knowledge.afterShellOut
+      case _ => knowledge

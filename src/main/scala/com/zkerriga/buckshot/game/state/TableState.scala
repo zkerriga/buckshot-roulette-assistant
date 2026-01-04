@@ -1,6 +1,5 @@
 package com.zkerriga.buckshot.game.state
 
-import com.zkerriga.buckshot.engine.Printer
 import com.zkerriga.buckshot.game.events.outcome.Outcome.Reset
 import com.zkerriga.buckshot.game.state.partitipant.Side.Player
 import com.zkerriga.buckshot.game.state.partitipant.{Hands, Items, Participant, Side}
@@ -14,8 +13,7 @@ case class TableState(
   dealer: Participant,
   shotgun: Shotgun,
   player: Participant,
-):
-  override def toString: String = Printer.print(this)
+)
 
 object TableState:
   def from(reset: Reset, shells: Shotgun.ShellDistribution, dealer: Items, player: Items): TableState =

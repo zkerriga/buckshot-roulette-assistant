@@ -15,4 +15,4 @@ object Printer:
     s"Shotgun(shells=ShellDistribution(live=Nat[${s.live}], Nat[${s.blank}]),effects=Effects(damage = Damage.${s.damage},inverted=${s.inverted}))"
 
   def print(items: Items): String =
-    s"Items(${items.asList.mkString(",")})"
+    ???
