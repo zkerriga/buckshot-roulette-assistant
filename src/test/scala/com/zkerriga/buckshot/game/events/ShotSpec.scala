@@ -39,7 +39,7 @@ class ShotSpec extends AnyWordSpec, Matchers:
         dealer = Participant(
           health = Health[2],
           items = Items(
-            Beer,
+            Slot1 -> Beer,
           ),
           hands = Hands.Free,
         ),
@@ -53,13 +53,13 @@ class ShotSpec extends AnyWordSpec, Matchers:
         player = Participant(
           health = Health[2],
           items = Items(
-            Cigarettes,
-            MagnifyingGlass,
+            Slot1 -> Cigarettes,
+            Slot2 -> MagnifyingGlass,
           ),
           hands = Hands.Free,
         ),
       )
       val shot = Shot(actor = Player, target = Dealer, shell = Live)
       Shot.execute(state, shot) mustBe Right(
-        PlayerWins(player = Items(Cigarettes, MagnifyingGlass), dealer = Items(Beer)),
+        PlayerWins(player = Items(Slot1 -> Cigarettes, Slot2 -> MagnifyingGlass), dealer = Items(Slot1 -> Beer)),
       )

@@ -1,7 +1,7 @@
 package com.zkerriga.buckshot.game.events
 
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.Used.ItemUse
+import com.zkerriga.buckshot.game.events.ItemUse
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribution}
 import com.zkerriga.buckshot.game.state.{HealthLimit, TableState}
@@ -18,8 +18,8 @@ class UsedSpec extends AnyWordSpec, Matchers:
         dealer = Participant(
           health = Health[2],
           items = Items(
-            Beer,
-            MagnifyingGlass,
+            Slot1 -> Beer,
+            Slot2 -> MagnifyingGlass,
           ),
           hands = Hands.CuffedForOneShot,
         ),
@@ -33,14 +33,14 @@ class UsedSpec extends AnyWordSpec, Matchers:
         player = Participant(
           health = Health[2],
           items = Items(
-            Adrenaline,
-            Cigarettes,
-            Beer,
+            Slot1 -> Adrenaline,
+            Slot2 -> Cigarettes,
+            Slot3 -> Beer,
           ),
           hands = Hands.Free,
         ),
       )
-      val used = Used(actor = Player, item = ItemUse.Beer(out = Live), stolen = true)
+      val used = Used(actor = Player, item = ItemUse.Beer(out = Live), on = Slot1, viaAdrenalineOn = Some(Slot1))
       Used.execute(state, used) mustBe Right(
         TableState(
           maxHealth = HealthLimit[4],
@@ -48,7 +48,7 @@ class UsedSpec extends AnyWordSpec, Matchers:
           dealer = Participant(
             health = Health[2],
             items = Items(
-              MagnifyingGlass,
+              Slot2 -> MagnifyingGlass,
             ),
             hands = Hands.CuffedForOneShot,
           ),
@@ -62,8 +62,8 @@ class UsedSpec extends AnyWordSpec, Matchers:
           player = Participant(
             health = Health[2],
             items = Items(
-              Cigarettes,
-              Beer,
+              Slot2 -> Cigarettes,
+              Slot3 -> Beer,
             ),
             hands = Hands.Free,
           ),
@@ -86,10 +86,10 @@ class UsedSpec extends AnyWordSpec, Matchers:
         player = Participant(
           health = Health[1],
           items = Items(
-            Meds,
+            Slot1 -> Meds,
           ),
           hands = Hands.Free,
         ),
       )
-      val used = Used(actor = Player, item = ItemUse.Meds(good = false), stolen = false)
+      val used = Used(actor = Player, item = ItemUse.Meds(good = false), on = Slot1, viaAdrenalineOn = None)
       Used.execute(state, used) mustBe Right(DealerWins)
