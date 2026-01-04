@@ -81,7 +81,7 @@ object DealerUsed extends Logging:
         case None => knowledge.notes.withoutItemOn(used.on)
       }
       notes = used.item match {
-        case ItemUse.Meds => adjustedNotes.usingMeds
+        case _: ItemUse.Meds => adjustedNotes.usingMeds
         case _ => adjustedNotes
       }
     } yield DealerKnowledge(

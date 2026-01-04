@@ -197,7 +197,7 @@ object SetupWindow:
           .map(box => Option(box.getSelectedItem))
           .collect:
             case Some(item: Item) => item
-      ItemsForm(Items(selected*))
+      ItemsForm(???/*Items(selected*)*/)
 
     Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
       Panel(GridLayout(2)).withAll(

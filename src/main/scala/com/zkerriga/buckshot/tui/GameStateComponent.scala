@@ -9,6 +9,7 @@ import com.zkerriga.buckshot.game
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.shotgun.Shell
+import com.zkerriga.buckshot.tui.ItemGridComponent.labelName
 import com.zkerriga.types.Chance
 
 object GameStateComponent:
@@ -35,14 +36,14 @@ object GameStateComponent:
       EmptySpace(),
       items(game.dealer.items),
       EmptySpace(),
-      meta(game.dealer, game.knowledge.dealer, game.shotgun, game.maxHealth)
+      meta(game.dealer, game.hidden.dealer.belief, game.shotgun, game.maxHealth)
         .setLayoutData(createLayoutData(Alignment.Fill)),
     )
 
   private def player(game: GameState): Panel =
     import LinearLayout.*
     Panel(LinearLayout(Direction.VERTICAL)).withAll(
-      meta(game.player, BeliefState.deterministic(game.knowledge.player), game.shotgun, game.maxHealth)
+      meta(game.player, BeliefState.deterministic(game.hidden.player.revealed), game.shotgun, game.maxHealth)
         .setLayoutData(createLayoutData(Alignment.Fill)),
       EmptySpace(),
       items(game.player.items),
@@ -58,29 +59,11 @@ object GameStateComponent:
         Option.when(side == turnOf)(Label("← turn")),
       ).flatten
 
-  private def items(items: Items): Panel =
-    Panel(GridLayout(3)).withSeq:
-      val labels = items.asList
-        .sortBy(_.toString)
-        .map:
-          case Adrenaline => Label("Adrenaline") // todo: colors can be set
-          case Handcuffs => Label("Handcuffs")
-          case MagnifyingGlass => Label("Magnifying Glass")
-          case Beer => Label("Beer")
-          case Cigarettes => Label("Cigarettes")
-          case Saw => Label("Saw")
-          case Inverter => Label("Inverter")
-          case BurnerPhone => Label("Burner Phone")
-          case Meds => Label("Meds")
-      val (left, right) = (labels ++ Seq.fill(8 - labels.size)(Label("-"))).splitAt(4)
-      left
-        .zip(right)
-        .flatMap: (leftItem, rightItem) =>
-          Seq(
-            leftItem,
-            Separator(Direction.VERTICAL),
-            rightItem,
-          )
+  private def items(items: Items): Component =
+    ItemGridComponent.render(items) {
+      case Some(itemOn) => Label(itemOn.item.labelName)
+      case None => Label(" ")
+    }
 
   private def shotgun(shotgun: Shotgun): Panel =
     Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
@@ -119,7 +102,7 @@ object GameStateComponent:
         Panel(LinearLayout(Direction.HORIZONTAL)).withAll(
           Label("Knows"),
           shells(shellsToShow.map(revealed.get)),
-          Label(if chance != Chance.Certain then chance.show else ""),
+          ChanceLabel.renderUncertain(chance),
         )
 
   private def health(current: Health, limit: HealthLimit): Label =

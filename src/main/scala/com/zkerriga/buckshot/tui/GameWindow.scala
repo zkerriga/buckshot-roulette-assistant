@@ -8,7 +8,6 @@ import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.{Shot, Used}
 import com.zkerriga.buckshot.journal.AppLog.Logging
-import com.zkerriga.buckshot.tui.InputComponent.Event
 
 object GameWindow extends Logging:
   def window(dialogs: Dialogs, engine: Engine): Window =
@@ -31,15 +30,9 @@ object GameWindow extends Logging:
               game,
               dealerPrediction,
               new InputComponent.Submit {
-                def event(event: InputComponent.Event): Unit = {
+                def event(event: Engine.Event): Unit = {
                   log.debug(s"submitted $event")
-                  val engineEvent: Engine.Event = event match {
-                    case Event.DealerShot(target, shell) => Shot(actor = Dealer, target = target, shell = shell)
-                    case Event.PlayerShot(target, shell) => Shot(actor = Player, target = target, shell = shell)
-                    case Event.DealerUsed(item, stolen) => Used(actor = Dealer, item = item, stolen = stolen)
-                    case Event.PlayerUsed(item, stolen) => PlayerUsed(item = item, stolen = stolen)
-                  }
-                  val result = engine.process(engineEvent)
+                  val result = engine.process(event)
                   result match {
                     case Left(errorText) => dialogs.showError(errorText)
                     case Right(reply) =>

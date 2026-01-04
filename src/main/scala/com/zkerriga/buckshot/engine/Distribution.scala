@@ -39,6 +39,10 @@ object Distribution:
         .map(_.chance)
         .getOrElse(Chance.NoChance)
 
+    def exists(f: A => Boolean): Boolean =
+      values.exists: (_, value) =>
+        f(value)
+
     def map[B](f: A => B): Distribution[B] =
       values.map: (chance, value) =>
         chance -> f(value)
