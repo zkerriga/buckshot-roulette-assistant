@@ -1,5 +1,6 @@
 package com.zkerriga.buckshot.engine
 
+import algebra.Semigroup
 import cats.Eq
 import cats.syntax.all.*
 import cats.data.NonEmptySeq
@@ -29,6 +30,8 @@ object Distribution:
 
   extension [A](values: Distribution[A])
     def asSeq: Seq[Possible[A]] = values.toSeq
+    def sumMerged[B](merge: Possible[A] => B)(using Semigroup[B]): B =
+      values.map(merge).reduce
 
     /** @note
       *   call on deduplicated [[Distribution]]

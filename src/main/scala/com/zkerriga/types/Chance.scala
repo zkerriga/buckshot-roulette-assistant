@@ -15,6 +15,7 @@ object Chance:
     infix def or(other: Chance): Chance = chance + other
     infix def and(other: Chance): Chance = chance * other
     infix def in(other: Chance): Chance = chance / other
+    infix def *(value: Double): Double = value * chance.toDouble
     def show(scale: Int): String = {
       val str = (chance.toBigDecimal(scale, RoundingMode.HALF_UP) * 100).toString()
       (if str.contains('.') then str.replaceAll("0+$", "") else str).stripSuffix(".") + "%"
