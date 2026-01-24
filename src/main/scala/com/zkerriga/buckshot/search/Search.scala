@@ -24,11 +24,14 @@ object Search:
   type Error = StateError | EngineError
 
   private def options(table: TableState): NonEmptyList[Action] =
+    val dropRestricted: Seq[ItemOn] => Seq[ItemOn] =
+      if table.shotgun.effects.damage == Damage.Double then _.filterNot(_.item == Saw)
+      else identity
     NonEmptyList(
       Action.Shoot(Dealer),
       List(
-        if table.player.hasAdrenaline then table.dealer.items.positioned.map(Action.Steal(_)) else Nil,
-        table.player.items.positioned.map(Action.Use(_)),
+        if table.player.hasAdrenaline then dropRestricted(table.dealer.items.positioned).map(Action.Steal(_)) else Nil,
+        dropRestricted(table.player.items.positioned).map(Action.Use(_)),
         List(Action.Shoot(Player)),
       ).flatten,
     )
@@ -42,7 +45,7 @@ object Search:
         case MagnifyingGlass => Distribution.deterministic(ItemUse.MagnifyingGlass)
         case Beer =>
           GameChances
-            .shellAt(state, Shell1)
+            .nextShell(state)
             .map: shell =>
               ItemUse.Beer(shell)
         case Cigarettes => Distribution.deterministic(ItemUse.Cigarettes)
@@ -58,12 +61,12 @@ object Search:
         case Handcuffs => Distribution.deterministic(FullItemUse.Handcuffs)
         case MagnifyingGlass =>
           GameChances
-            .shellAt(state, Shell1)
+            .nextShell(state)
             .map: shell =>
               FullItemUse.MagnifyingGlass(shell)
         case Beer =>
           GameChances
-            .shellAt(state, Shell1)
+            .nextShell(state)
             .map: shell =>
               FullItemUse.Beer(shell)
         case Cigarettes => Distribution.deterministic(FullItemUse.Cigarettes)
@@ -122,7 +125,7 @@ object Search:
                       )
                 case DealerAi.Action.Shoot(target) =>
                   GameChances
-                    .shellAt(next, Shell1)
+                    .nextShell(next)
                     .mathExpectation: shell =>
                       evaluateOutcome(DealerShot.executeSimple(next, DealerShot(target, shell)), depth)
 
@@ -149,7 +152,7 @@ object Search:
             )
       case Action.Shoot(target) =>
         GameChances
-          .shellAt(state, Shell1)
+          .nextShell(state)
           .mathExpectation: shell =>
             evaluateOutcome(PlayerShot.executeSimple(state, PlayerShot(target, shell)), depth)
 

@@ -26,6 +26,9 @@ object GameChances:
       )
     yield shell).deduplicate
 
+  def nextShell(state: GameState): Distribution[Shell] =
+    shellAt(state, Shell1).map(_.considering(state.shotgun.effects))
+
   def burnerPhonePosition(table: TableState): Option[Distribution[SeqNr]] =
     optional:
       val options = (table.shotgun.total minus Nat[1]).?

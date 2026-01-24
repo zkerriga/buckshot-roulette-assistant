@@ -41,7 +41,7 @@ object PlayerUsed:
       win => ContinuableOutcome.WinDetails(win, updateNotes(state.hidden.dealer.notes, used).slotGroups),
       reset => ContinuableOutcome.ResetDetails(reset, updateNotes(state.hidden.dealer.notes, used).slotGroups),
     )(
-      updatePlayer(used.item, state.hidden.player),
+      updatePlayer(used.item, state.shotgun, state.hidden.player),
       updateNotes(state.hidden.dealer.notes, used),
     )
 
@@ -74,9 +74,10 @@ object PlayerUsed:
       case Some(_) => notes.withoutItemOn(used.on)
       case None => notes
 
-  private def updatePlayer(item: FullItemUse, knowledge: PlayerKnowledge): PlayerKnowledge =
+  private def updatePlayer(item: FullItemUse, shotgun: Shotgun, knowledge: PlayerKnowledge): PlayerKnowledge =
     item match
-      case FullItemUse.MagnifyingGlass(revealed) => knowledge.knowing(revealed, Shell1)
+      case FullItemUse.MagnifyingGlass(revealed) =>
+        knowledge.knowing(revealed.considering(shotgun.effects), Shell1)
       case FullItemUse.BurnerPhone(revealed) =>
         revealed.fold(knowledge): (revealed, at) =>
           knowledge.knowing(revealed, at)
