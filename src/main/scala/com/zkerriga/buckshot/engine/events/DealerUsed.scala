@@ -6,7 +6,7 @@ import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerNotes, PlayerKnowledge}
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
-import com.zkerriga.buckshot.engine.{BeliefState, Distribution, EngineError, ShellChances}
+import com.zkerriga.buckshot.engine.{BeliefState, Distribution, EngineError, GameChances, ShellChances}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.game.events.outcome.StateError
@@ -105,16 +105,13 @@ object DealerUsed:
 
       case ItemUse.BurnerPhone =>
         belief.transform: revealed =>
-          (for
-            options <- table.shotgun.total minus Nat[1]
-            positions <- NonEmptySeq.fromSeq(
-              Seq(Shell2, Shell3, Shell4, Shell5, Shell6, Shell7, Shell8).take(options),
-            )
-          yield positions).fold(Distribution.deterministic(revealed)): positions =>
-            for
-              seqNr <- Distribution.weighted(positions.map(Nat[1] -> _))
-              shell <- shellAt(table, player = playerKnowledge, dealer = revealed, at = seqNr)
-            yield revealed.revealed(shell, seqNr)
+          GameChances
+            .burnerPhonePosition(table)
+            .fold(Distribution.deterministic(revealed)): positions =>
+              for
+                seqNr <- positions
+                shell <- shellAt(table, player = playerKnowledge, dealer = revealed, at = seqNr)
+              yield revealed.revealed(shell, seqNr)
 
       case ItemUse.Beer(out) => belief.update(_.afterShellOut)
       case _ => belief

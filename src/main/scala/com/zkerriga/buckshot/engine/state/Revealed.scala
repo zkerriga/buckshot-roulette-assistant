@@ -14,6 +14,7 @@ object Revealed:
   def apply(revealed: (SeqNr, Shell)*): Revealed = revealed.toMap
 
   extension (revealed: Revealed)
+    def size: Int = revealed.size
     def get(seqNr: SeqNr): Option[Shell] = revealed.get(seqNr)
     def count(shell: Shell): Nat = revealed.values.countNat(_ == shell)
     def except(at: SeqNr): Revealed = revealed - at

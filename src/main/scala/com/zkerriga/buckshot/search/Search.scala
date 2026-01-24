@@ -1,16 +1,17 @@
 package com.zkerriga.buckshot.search
 
 import cats.data.NonEmptyList
-import cats.kernel.Semigroup
-import com.zkerriga.buckshot.engine.EngineError.*
-import com.zkerriga.buckshot.engine.events.{ContinuableOutcome, PlayerShot}
+import cats.syntax.all.*
+import com.zkerriga.buckshot.engine.ai.DealerAi
+import com.zkerriga.buckshot.engine.events.*
 import com.zkerriga.buckshot.engine.state.GameState
-import com.zkerriga.buckshot.engine.{Distribution, EngineError, ShellChances}
+import com.zkerriga.buckshot.engine.{Distribution, EngineError, GameChances}
 import com.zkerriga.buckshot.game.all.*
+import com.zkerriga.buckshot.game.events.ItemUse
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.game.events.outcome.StateError
+import com.zkerriga.buckshot.game.state
 import com.zkerriga.buckshot.game.state.partitipant
-import com.zkerriga.types.Chance
 import com.zkerriga.types.steps.ResultExtension.*
 import steps.result.Result
 
@@ -20,7 +21,6 @@ object Search:
     case Steal(item: ItemOn)
     case Shoot(target: Side)
 
-  type Evaluation = Double
   type Error = StateError | EngineError
 
   private def options(table: TableState): NonEmptyList[Action] =
@@ -33,51 +33,131 @@ object Search:
       ).flatten,
     )
 
-  extension (evaluations: Distribution[Evaluation])
-    private def mathExpectation: Evaluation =
-      evaluations.sumMerged: (chance, evaluation) =>
-        chance * evaluation
+  import Evaluation.*
+
+  extension (state: GameState)
+    private def itemUseOf(item: RegularItem): Distribution[ItemUse] =
+      item match
+        case Handcuffs => Distribution.deterministic(ItemUse.Handcuffs)
+        case MagnifyingGlass => Distribution.deterministic(ItemUse.MagnifyingGlass)
+        case Beer =>
+          GameChances
+            .shellAt(state, Shell1)
+            .map: shell =>
+              ItemUse.Beer(shell)
+        case Cigarettes => Distribution.deterministic(ItemUse.Cigarettes)
+        case Saw => Distribution.deterministic(ItemUse.Saw)
+        case Inverter => Distribution.deterministic(ItemUse.Inverter)
+        case BurnerPhone => Distribution.deterministic(ItemUse.BurnerPhone)
+        case Meds =>
+          GameChances.MedsGood.map: good =>
+            ItemUse.Meds(good = good)
+
+    private def fullItemUseOf(item: RegularItem): Distribution[FullItemUse] =
+      item match
+        case Handcuffs => Distribution.deterministic(FullItemUse.Handcuffs)
+        case MagnifyingGlass =>
+          GameChances
+            .shellAt(state, Shell1)
+            .map: shell =>
+              FullItemUse.MagnifyingGlass(shell)
+        case Beer =>
+          GameChances
+            .shellAt(state, Shell1)
+            .map: shell =>
+              FullItemUse.Beer(shell)
+        case Cigarettes => Distribution.deterministic(FullItemUse.Cigarettes)
+        case Saw => Distribution.deterministic(FullItemUse.Saw)
+        case Inverter => Distribution.deterministic(FullItemUse.Inverter)
+        case BurnerPhone =>
+          GameChances
+            .burnerPhonePosition(state.public)
+            .map: positions =>
+              for
+                seqNr <- positions
+                shell <- GameChances.shellAt(state, seqNr)
+              yield FullItemUse.BurnerPhone((revealed = shell, at = seqNr).some)
+            .getOrElse:
+              Distribution.deterministic(FullItemUse.BurnerPhone(None))
+
+        case Meds =>
+          GameChances.MedsGood.map: good =>
+            FullItemUse.Meds(good = good)
 
   private def evaluateOutcome(
     outcome: DealerWins.type | ContinuableOutcome | GameState,
     depth: Int,
   )(using Raise[Error]): Evaluation =
     outcome match
-      case DealerWins => ??? // todo: a constant
-      case ContinuableOutcome.WinDetails(win = win) => ??? // todo: win item evaluation
-      case ContinuableOutcome.ResetDetails(reset = reset) => ??? // todo: reset details evaluation
+      case DealerWins => DealerWinsEvaluation
+      case win: ContinuableOutcome.WinDetails => Evaluation.evaluateWin(win)
+      case reset: ContinuableOutcome.ResetDetails => Evaluation.evaluateReset(reset)
       case next: GameState =>
-        if depth > 0 then search(next, depth - 1).evaluation
-        else ??? // todo: heuristic state evaluation
+        next.turn match
+          case Player =>
+            if depth > 0 then search(next, depth - 1).evaluation
+            else Evaluation.evaluateState(next)
+          case Dealer =>
+            GameChances
+              .nextDealerAction(next)
+              .mathExpectation:
+                case DealerAi.Action.Use(itemOn) =>
+                  next
+                    .itemUseOf(itemOn.item)
+                    .mathExpectation: itemUse =>
+                      evaluateOutcome(
+                        DealerUsed.executeSimple(next, DealerUsed(itemUse, itemOn.on, viaAdrenaline = None)),
+                        depth,
+                      )
+                case DealerAi.Action.Steal(itemOn) =>
+                  next
+                    .itemUseOf(itemOn.item)
+                    .mathExpectation: itemUse =>
+                      evaluateOutcome(
+                        DealerUsed.executeSimple(
+                          next,
+                          DealerUsed(itemUse, itemOn.on, viaAdrenaline = next.dealer.items.adrenaline.headOption),
+                        ),
+                        depth,
+                      )
+                case DealerAi.Action.Shoot(target) =>
+                  GameChances
+                    .shellAt(next, Shell1)
+                    .mathExpectation: shell =>
+                      evaluateOutcome(DealerShot.executeSimple(next, DealerShot(target, shell)), depth)
 
   private def evaluateAction(state: GameState, action: Action, depth: Int)(using Raise[Error]): Evaluation =
-    action match {
-      case Action.Use(item) => ???
-      case Action.Steal(item) => ???
+    action match
+      case Action.Use(itemOn) =>
+        state
+          .fullItemUseOf(itemOn.item)
+          .mathExpectation: itemUse =>
+            evaluateOutcome(
+              PlayerUsed.executeSimple(state, PlayerUsed(itemUse, itemOn.on, viaAdrenaline = None)),
+              depth,
+            )
+      case Action.Steal(itemOn) =>
+        state
+          .fullItemUseOf(itemOn.item)
+          .mathExpectation: itemUse =>
+            evaluateOutcome(
+              PlayerUsed.executeSimple(
+                state,
+                PlayerUsed(itemUse, itemOn.on, viaAdrenaline = state.player.items.adrenaline.headOption),
+              ),
+              depth,
+            )
       case Action.Shoot(target) =>
-        val shellChances = for {
-          dealerRevealed <- state.hidden.dealer.belief.getDistribution
-          shell <- ShellChances.shellAt(
-            shotgun = state.shotgun,
-            player = state.hidden.player.revealed,
-            dealer = dealerRevealed,
-            at = Shell1,
-          )
-        } yield shell
-        val evaluatedOutcomes = shellChances.deduplicate.map: shell =>
-          // todo: how to avoid conditioning inside of event execution?
-          // todo: maybe extract conditioning into a separate pre-execute step?
-          val outcome = PlayerShot.executeSimple(state, PlayerShot(target, shell))
-          evaluateOutcome(outcome, depth)
-        evaluatedOutcomes.mathExpectation
-    }
+        GameChances
+          .shellAt(state, Shell1)
+          .mathExpectation: shell =>
+            evaluateOutcome(PlayerShot.executeSimple(state, PlayerShot(target, shell)), depth)
 
   private def search(state: GameState, depth: Int)(using Raise[Error]): (action: Action, evaluation: Evaluation) =
     options(state.public)
       .map: action =>
         (action = action, evaluation = evaluateAction(state, action, depth))
-      .toList
-      .maxBy(_.evaluation)
+      .bestBy(_.evaluation)
 
   def best(state: GameState): Result[(action: Action, evaluation: Evaluation), Error] =
     Result.scope:

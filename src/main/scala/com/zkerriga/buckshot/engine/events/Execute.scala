@@ -8,11 +8,8 @@ import com.zkerriga.buckshot.game.events.Shot
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, PlayerWins, Reset}
 import com.zkerriga.buckshot.game.events.outcome.StateError
 import com.zkerriga.buckshot.game.state.TableState
-import com.zkerriga.types.boundaries.eithers
-import com.zkerriga.types.boundaries.eithers.*
 import com.zkerriga.types.steps.ResultExtension.*
 import steps.result.Result
-import steps.result.ScalaConverters.*
 
 object Execute:
   def shot(state: GameState, event: Shot)(player: PlayerKnowledge, notes: DealerNotes)(
@@ -33,9 +30,7 @@ object Execute:
     notes: DealerNotes,
   )(
     belief: TableState => Option[BeliefState[Revealed]],
-  )(using
-    Raise[StateError | EngineError],
-  ): DealerWins | ContinuableOutcome | GameState =
+  )(using Raise[StateError | EngineError]): DealerWins | ContinuableOutcome | GameState =
     handler(state.public, event) match
       case DealerWins => DealerWins
       case win: PlayerWins => onWin(win)

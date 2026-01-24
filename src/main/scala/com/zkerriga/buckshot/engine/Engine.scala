@@ -61,9 +61,7 @@ class Engine(state: Ref[DealerWins.type | ContinuableOutcome | GameState]):
                 (newState, EventReply.NewState(newState).asOk)
 
   def calculateDealerPrediction(state: GameState): Distribution[DealerAi.Action] =
-    state.hidden.dealer.belief.getDistribution
-      .flatMap(DealerAi.next(state.public, state.hidden.dealer.notes, _)) // todo: add cache
-      .deduplicate
+    GameChances.nextDealerAction(state)
 
   def calculateShellsChances(state: GameState): Seq[(SeqNr, Distribution[Shell])] =
     SeqNr.values.toSeq.take(state.shotgun.total).map { seqNr =>
