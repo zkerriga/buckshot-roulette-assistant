@@ -6,8 +6,10 @@ import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribution}
 import com.zkerriga.types.{Chance, Nat}
+import com.zkerriga.types.steps.ResultExtension.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import steps.result.Result
 
 class PlayerShotSpec extends AnyWordSpec, Matchers:
   "execute" should:
@@ -71,8 +73,8 @@ class PlayerShotSpec extends AnyWordSpec, Matchers:
       )
 
       val event = PlayerShot(target = Dealer, shell = Live)
-      PlayerShot.execute(state, event) match
-        case Right(state: GameState) =>
+      Result.scope(PlayerShot.execute(state, event)) match
+        case Result.Ok(state: GameState) =>
           state.shotgun.shells mustBe ShellDistribution(live = Nat[2], blank = Nat[3])
           state.hidden mustBe PrivateStates(
             dealer = DealerKnowledge(

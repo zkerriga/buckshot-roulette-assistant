@@ -9,6 +9,7 @@ import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribut
 import com.zkerriga.types.Nat
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import steps.result.Result
 
 class EngineSpec extends AnyWordSpec, Matchers:
   "Engine" should:
@@ -51,6 +52,6 @@ class EngineSpec extends AnyWordSpec, Matchers:
 
       val engine = Engine.start(GameState(table, hidden))
       engine.process(DealerUsed(ItemUse.MagnifyingGlass, Slot6, None)) match {
-        case Left(error) => fail(s"unexpected $error")
-        case Right(_) => succeed
+        case Result.Err(error) => fail(s"unexpected $error")
+        case Result.Ok(_) => succeed
       }

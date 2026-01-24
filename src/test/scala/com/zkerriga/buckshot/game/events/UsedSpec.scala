@@ -6,8 +6,10 @@ import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribution}
 import com.zkerriga.buckshot.game.state.{HealthLimit, TableState}
 import com.zkerriga.types.Nat
+import com.zkerriga.types.steps.ResultExtension.*
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import steps.result.Result
 
 class UsedSpec extends AnyWordSpec, Matchers:
   "Used" should:
@@ -41,7 +43,7 @@ class UsedSpec extends AnyWordSpec, Matchers:
         ),
       )
       val used = Used(actor = Player, item = ItemUse.Beer(out = Live), on = Slot1, viaAdrenalineOn = Some(Slot1))
-      Used.execute(state, used) mustBe Right(
+      Result.scope(Used.execute(state, used)) mustBe Result.Ok(
         TableState(
           maxHealth = HealthLimit[4],
           turn = Player,
@@ -92,4 +94,4 @@ class UsedSpec extends AnyWordSpec, Matchers:
         ),
       )
       val used = Used(actor = Player, item = ItemUse.Meds(good = false), on = Slot1, viaAdrenalineOn = None)
-      Used.execute(state, used) mustBe Right(DealerWins)
+      Result.scope(Used.execute(state, used)) mustBe Result.Ok(DealerWins)

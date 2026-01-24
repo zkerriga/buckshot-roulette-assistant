@@ -4,9 +4,11 @@ import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, PlayerWins}
 import com.zkerriga.buckshot.game.state.shotgun.Shotgun.{Effects, ShellDistribution}
 import com.zkerriga.buckshot.game.state.{HealthLimit, TableState}
+import com.zkerriga.types.steps.ResultExtension.*
 import com.zkerriga.types.{Nat, Quantity}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import steps.result.Result
 
 class ShotSpec extends AnyWordSpec, Matchers:
   "Shot" should:
@@ -30,7 +32,7 @@ class ShotSpec extends AnyWordSpec, Matchers:
         ),
       )
       val shot = Shot(actor = Dealer, target = Player, shell = Live)
-      Shot.execute(state, shot) mustBe Right(DealerWins)
+      Result.scope(Shot.execute(state, shot)) mustBe Result.Ok(DealerWins)
 
     "return GameOver if dealer is killed by player's shot with saw" in:
       val state = TableState(
@@ -60,6 +62,6 @@ class ShotSpec extends AnyWordSpec, Matchers:
         ),
       )
       val shot = Shot(actor = Player, target = Dealer, shell = Live)
-      Shot.execute(state, shot) mustBe Right(
+      Result.scope(Shot.execute(state, shot)) mustBe Result.Ok(
         PlayerWins(player = Items(Slot1 -> Cigarettes, Slot2 -> MagnifyingGlass), dealer = Items(Slot1 -> Beer)),
       )

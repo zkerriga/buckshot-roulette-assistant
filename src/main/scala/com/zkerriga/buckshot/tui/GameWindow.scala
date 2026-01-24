@@ -8,6 +8,7 @@ import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.events.outcome.Outcome.{PlayerWins, Reset}
 import com.zkerriga.buckshot.game.state.partitipant.Side.{Dealer, Player}
 import com.zkerriga.buckshot.journal.AppLog.Logging
+import steps.result.Result
 
 object GameWindow extends Logging:
   def window(dialogs: Dialogs, engine: Engine, setContinuation: ContinuableOutcome => Unit): Window =
@@ -28,8 +29,8 @@ object GameWindow extends Logging:
 
   private def composition(dialogs: Dialogs, engine: Engine, setContinuation: ContinuableOutcome => Unit): Panel =
     engine.getState match
-      case Left(error) => Panel().withAll(Label(error))
-      case Right(game) =>
+      case Result.Err(error) => Panel().withAll(Label(error))
+      case Result.Ok(game) =>
         val gameStateDynamic = DynamicComponent.updatable(game)(GameStateComponent.render)
         val controlDynamic = DynamicComponent.selfUpdatable[GameState](game) { (game, update) =>
           ControlComponent.render(
@@ -40,8 +41,8 @@ object GameWindow extends Logging:
                 log.debug(s"submitted $event")
                 val result = engine.process(event)
                 result match {
-                  case Left(errorText) => dialogs.showError(errorText)
-                  case Right(reply) =>
+                  case Result.Err(errorText) => dialogs.showError(errorText)
+                  case Result.Ok(reply) =>
                     reply match {
                       case EventReply.NewState(state) =>
                         log.debug(s"updating components to $state")

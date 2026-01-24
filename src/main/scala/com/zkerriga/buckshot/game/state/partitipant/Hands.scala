@@ -1,6 +1,8 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
+import com.zkerriga.buckshot.game.events.outcome.StateError.*
+import com.zkerriga.types.steps.ResultExtension.*
+import steps.result.Result
 
 enum Hands:
   case Free, CuffedForTwoShots, CuffedForOneShot
@@ -9,9 +11,9 @@ object Hands:
   extension (hands: Hands)
     def free: Boolean = hands == Free
 
-    def cuffed: V[Hands] =
-      if free then CuffedForTwoShots.ok
-      else HandsAlreadyCuffed.lift
+    def cuffed(using raise: Raise[HandsAlreadyCuffed.type]): Hands =
+      if free then CuffedForTwoShots
+      else raise.raise(HandsAlreadyCuffed)
 
     def afterTurn: Hands = hands match
       case Free | CuffedForOneShot => Free

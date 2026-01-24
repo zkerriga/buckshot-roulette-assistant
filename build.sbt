@@ -1,4 +1,4 @@
-val scala3Version = "3.7.4"
+val scala3Version = "3.8.1"
 
 lazy val root = project
   .in(file("."))
@@ -9,6 +9,7 @@ lazy val root = project
     assembly / mainClass := Some("com.zkerriga.buckshot.Main"),
     assembly / assemblyJarName := s"${name.value}.jar",
     libraryDependencies ++= Seq(
+      "ch.epfl.lamp" %% "steps" % "0.1.0-RC1",
       "org.typelevel" %% "cats-core" % "2.13.0",
       "org.typelevel" %% "cats-effect" % "3.6.3",
       "org.typelevel" %% "cats-effect-cps" % "0.5.0",

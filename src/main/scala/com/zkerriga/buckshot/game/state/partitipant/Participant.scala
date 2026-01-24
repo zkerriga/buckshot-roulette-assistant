@@ -1,9 +1,10 @@
 package com.zkerriga.buckshot.game.state.partitipant
 
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg.*
+import com.zkerriga.buckshot.game.events.outcome.StateError.*
 import com.zkerriga.buckshot.game.state.HealthLimit
 import com.zkerriga.buckshot.game.state.items.{RegularItem, Slot}
 import com.zkerriga.buckshot.game.state.partitipant.Items.ItemOn
+import com.zkerriga.types.steps.ResultExtension.*
 
 case class Participant(
   health: Health,
@@ -33,9 +34,8 @@ object Participant:
     def healed(by: Heal, maxHealth: HealthLimit): Participant =
       participant.copy(health = participant.health.healed(by, maxHealth))
 
-    def cuffed: V[Participant] =
-      participant.hands.cuffed.map: updated =>
-        participant.copy(hands = updated)
+    def cuffed(using Raise[HandsAlreadyCuffed.type]): Participant =
+      participant.copy(hands = participant.hands.cuffed)
 
     def afterTurn: Participant =
       participant.copy(hands = participant.hands.afterTurn)

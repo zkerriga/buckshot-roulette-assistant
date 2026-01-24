@@ -3,25 +3,29 @@ package com.zkerriga.buckshot.engine.events
 import cats.data.NonEmptySeq
 import cats.syntax.all.*
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
-import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerNotes, PlayerKnowledge}
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
-import com.zkerriga.buckshot.engine.{BeliefState, Distribution, ShellChances}
+import com.zkerriga.buckshot.engine.{BeliefState, Distribution, EngineError, ShellChances}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
+import com.zkerriga.buckshot.game.events.outcome.StateError
 import com.zkerriga.buckshot.game.events.{ItemUse, Used}
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.buckshot.game.state.items.Slot
 import com.zkerriga.buckshot.game.state.partitipant.Items.ItemOn
 import com.zkerriga.types.boundaries.optional
 import com.zkerriga.types.boundaries.optional.*
+import com.zkerriga.types.steps.ResultExtension.*
 import com.zkerriga.types.{Chance, Nat}
 
 case class DealerUsed(item: ItemUse, on: Slot, viaAdrenaline: Option[Slot])
 
 object DealerUsed:
-  def execute(state: GameState, used: DealerUsed): V[DealerWins | ContinuableOutcome | GameState] =
+  def execute(
+    state: GameState,
+    used: DealerUsed,
+  )(using Raise[StateError | EngineError]): DealerWins | ContinuableOutcome | GameState =
     exec(state, used): table =>
       optional:
         updateBelief(
@@ -37,11 +41,14 @@ object DealerUsed:
           ).?,
         )
 
-  def executeSimple(state: GameState, used: DealerUsed): V[DealerWins | ContinuableOutcome | GameState] =
+  def executeSimple(
+    state: GameState,
+    used: DealerUsed,
+  )(using Raise[StateError | EngineError]): DealerWins | ContinuableOutcome | GameState =
     exec(state, used): table =>
       updateBelief(state.hidden.player, used, table, state.hidden.dealer.belief).some
 
-  private def exec(state: GameState, used: DealerUsed) =
+  private def exec(state: GameState, used: DealerUsed)(using Raise[StateError | EngineError]) =
     val event = Used(actor = Dealer, item = used.item, on = used.on, viaAdrenalineOn = used.viaAdrenaline)
     Execute.public(state, event)(Used.execute)(
       win => ContinuableOutcome.WinDetails(win, updateNotes(state.hidden.dealer.notes, used).slotGroups),

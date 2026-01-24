@@ -5,58 +5,60 @@ import com.zkerriga.buckshot.engine.ai.DealerAi
 import com.zkerriga.buckshot.engine.events.*
 import com.zkerriga.buckshot.engine.state.GameState
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
+import com.zkerriga.buckshot.game.events.outcome.StateError
 import com.zkerriga.buckshot.journal.AppLog.Logging
 import com.zkerriga.types.Ref
+import com.zkerriga.types.steps.ResultExtension.*
+import steps.result.Result
 
 class Engine(state: Ref[DealerWins.type | ContinuableOutcome | GameState]):
-  def getState: Either[ErrorText, GameState] =
+  def getState: Result[GameState, ErrorText] =
     state.get match
-      case outcome: (DealerWins.type | ContinuableOutcome) => "no state".error
-      case state: GameState => state.ok
+      case outcome: (DealerWins | ContinuableOutcome) => "no state".asError
+      case state: GameState => state.asOk
 
-  def process(event: Engine.Event): Either[ErrorText, EventReply] =
+  def process(event: Engine.Event): Result[EventReply, ErrorText] =
     state.modify:
-      case outcome: (DealerWins.type | ContinuableOutcome) => (outcome, "game over".error)
+      case outcome: (DealerWins | ContinuableOutcome) => (outcome, Result.Err("game over"))
       case state: GameState =>
         log.info(s"processing event $event")
         execute(state, event) match
-          case Left(error) =>
+          case Result.Err(error) =>
             error match
               case EngineError.BadConditioning =>
                 log.error(s"critical problem with conditioning, while processing $event on $state")
-                (state, "critical issue".error)
-              case ErrorMsg.WrongTurn =>
+                (state, "critical issue".asError)
+              case StateError.WrongTurn =>
                 log.warn(s"wrong turn for $event on $state")
-                (state, "wrong turn".error)
-              case ErrorMsg.ShotgunStateMismatch =>
+                (state, "wrong turn".asError)
+              case StateError.ShotgunStateMismatch =>
                 log.error(s"shotgun state mismatch, while processing $event on $state")
-                (state, "critical issue".error)
-              case ErrorMsg.MissingItem =>
+                (state, "critical issue".asError)
+              case StateError.MissingItem =>
                 log.warn(s"missing item for $event on $state")
-                (state, s"missing item".error)
-              case ErrorMsg.SawAlreadyUsed =>
+                (state, s"missing item".asError)
+              case StateError.SawAlreadyUsed =>
                 log.warn(s"saw already used for $event on $state")
-                (state, "saw already used".error)
-              case ErrorMsg.HandsAlreadyCuffed =>
+                (state, "saw already used".asError)
+              case StateError.HandsAlreadyCuffed =>
                 log.warn(s"hands already cuffed for $event on $state")
-                (state, "hands already cuffed".error)
+                (state, "hands already cuffed".asError)
 
-          case Right(outcome) =>
+          case Result.Ok(outcome) =>
             outcome match
               case DealerWins =>
                 log.info("game is lost")
-                (DealerWins, EventReply.GameOver(None).ok)
+                (DealerWins, EventReply.GameOver(None).asOk)
               case win: ContinuableOutcome.WinDetails =>
                 log.info(s"game is over with $win")
-                (win, EventReply.GameOver(Some(win)).ok)
+                (win, EventReply.GameOver(Some(win)).asOk)
               case reset: ContinuableOutcome.ResetDetails =>
                 log.info("shotgun is resetting")
-                (reset, EventReply.ShotgunReset(reset).ok)
+                (reset, EventReply.ShotgunReset(reset).asOk)
               case newState: GameState =>
                 log.debug(s"state chanced to $newState")
-                (newState, EventReply.NewState(newState).ok)
+                (newState, EventReply.NewState(newState).asOk)
 
   def calculateDealerPrediction(state: GameState): Distribution[DealerAi.Action] =
     state.hidden.dealer.belief.getDistribution
@@ -74,17 +76,15 @@ object Engine extends Logging:
   private def execute(
     state: GameState,
     event: Event,
-  ): Either[ErrorMsg | EngineError, DealerWins.type | ContinuableOutcome | GameState] =
-    event match
-      case e: PlayerShot => PlayerShot.execute(state, e)
-      case e: DealerShot => DealerShot.execute(state, e)
-      case e: DealerUsed => DealerUsed.execute(state, e)
-      case e: PlayerUsed => PlayerUsed.execute(state, e)
+  ): Result[DealerWins | ContinuableOutcome | GameState, StateError | EngineError] =
+    Result.scope:
+      event match
+        case e: PlayerShot => PlayerShot.execute(state, e)
+        case e: DealerShot => DealerShot.execute(state, e)
+        case e: DealerUsed => DealerUsed.execute(state, e)
+        case e: PlayerUsed => PlayerUsed.execute(state, e)
 
   type ErrorText = String
-
-  extension (text: ErrorText) private[Engine] def error = Left(text)
-  extension [A](value: A) private[Engine] def ok = Right(value)
 
   enum EventReply:
     case NewState(state: GameState)

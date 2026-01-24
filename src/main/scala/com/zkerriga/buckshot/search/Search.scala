@@ -2,15 +2,17 @@ package com.zkerriga.buckshot.search
 
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
-import com.zkerriga.buckshot.engine.{Distribution, EngineError, ShellChances}
 import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.events.{ContinuableOutcome, PlayerShot}
 import com.zkerriga.buckshot.engine.state.GameState
+import com.zkerriga.buckshot.engine.{Distribution, EngineError, ShellChances}
 import com.zkerriga.buckshot.game.all.*
-import com.zkerriga.buckshot.game.events.outcome.ErrorMsg
 import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
+import com.zkerriga.buckshot.game.events.outcome.StateError
 import com.zkerriga.buckshot.game.state.partitipant
 import com.zkerriga.types.Chance
+import com.zkerriga.types.steps.ResultExtension.*
+import steps.result.Result
 
 object Search:
   enum Action:
@@ -19,6 +21,7 @@ object Search:
     case Shoot(target: Side)
 
   type Evaluation = Double
+  type Error = StateError | EngineError
 
   private def options(table: TableState): NonEmptyList[Action] =
     NonEmptyList(
@@ -30,22 +33,15 @@ object Search:
       ).flatten,
     )
 
-  private case class WrongCalculation(error: ErrorMsg | EngineError) extends Throwable
-  private object WrongCalculation:
-    extension [A](value: V[A])
-      def orThrow: A =
-        value match
-          case Left(error) => throw WrongCalculation(error)
-          case Right(a) => a
-
-  import WrongCalculation.*
-
   extension (evaluations: Distribution[Evaluation])
     private def mathExpectation: Evaluation =
       evaluations.sumMerged: (chance, evaluation) =>
         chance * evaluation
 
-  private def evaluateOutcome(outcome: DealerWins.type | ContinuableOutcome | GameState, depth: Int): Evaluation =
+  private def evaluateOutcome(
+    outcome: DealerWins.type | ContinuableOutcome | GameState,
+    depth: Int,
+  )(using Raise[Error]): Evaluation =
     outcome match
       case DealerWins => ??? // todo: a constant
       case ContinuableOutcome.WinDetails(win = win) => ??? // todo: win item evaluation
@@ -54,7 +50,7 @@ object Search:
         if depth > 0 then search(next, depth - 1).evaluation
         else ??? // todo: heuristic state evaluation
 
-  private def evaluateAction(state: GameState, action: Action, depth: Int): Evaluation =
+  private def evaluateAction(state: GameState, action: Action, depth: Int)(using Raise[Error]): Evaluation =
     action match {
       case Action.Use(item) => ???
       case Action.Steal(item) => ???
@@ -71,20 +67,18 @@ object Search:
         val evaluatedOutcomes = shellChances.deduplicate.map: shell =>
           // todo: how to avoid conditioning inside of event execution?
           // todo: maybe extract conditioning into a separate pre-execute step?
-          val outcome = PlayerShot.execute(state, PlayerShot(target, shell)).orThrow
+          val outcome = PlayerShot.executeSimple(state, PlayerShot(target, shell))
           evaluateOutcome(outcome, depth)
         evaluatedOutcomes.mathExpectation
     }
 
-  private def search(state: GameState, depth: Int): (action: Action, evaluation: Evaluation) =
+  private def search(state: GameState, depth: Int)(using Raise[Error]): (action: Action, evaluation: Evaluation) =
     options(state.public)
       .map: action =>
         (action = action, evaluation = evaluateAction(state, action, depth))
       .toList
       .maxBy(_.evaluation)
 
-  def best(state: GameState): V[(action: Action, evaluation: Evaluation)] =
-    try search(state, depth = 1000).ok
-    catch {
-      case WrongCalculation(error) => Left(error)
-    }
+  def best(state: GameState): Result[(action: Action, evaluation: Evaluation), Error] =
+    Result.scope:
+      search(state, depth = 1000)
