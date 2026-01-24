@@ -8,4 +8,4 @@ enum EngineError:
 object EngineError:
   type V[+A] = Either[ErrorMsg | EngineError, A]
 
-  extension [A](value: A) def ok: V[A] = Right(value)
+  extension [A](value: A) inline def ok: Right[Nothing, A] = Right(value)

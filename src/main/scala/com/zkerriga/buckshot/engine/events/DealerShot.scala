@@ -1,59 +1,51 @@
 package com.zkerriga.buckshot.engine.events
 
-import cats.Eq
+import cats.syntax.all.*
+import com.zkerriga.buckshot.engine.BeliefState
 import com.zkerriga.buckshot.engine.DealerBeliefChecks.missOnShellOut
 import com.zkerriga.buckshot.engine.EngineError.*
 import com.zkerriga.buckshot.engine.ai.DealerAi
-import com.zkerriga.buckshot.engine.state.PrivateStates.{DealerKnowledge, DealerNotes}
+import com.zkerriga.buckshot.engine.state.PrivateStates.DealerKnowledge
 import com.zkerriga.buckshot.engine.state.{GameState, PrivateStates, Revealed}
 import com.zkerriga.buckshot.game.all.*
 import com.zkerriga.buckshot.game.events.Shot
-import com.zkerriga.buckshot.game.events.outcome.Outcome.{DealerWins, GameOver, PlayerWins, Reset}
+import com.zkerriga.buckshot.game.events.outcome.Outcome.DealerWins
 import com.zkerriga.buckshot.game.state.TableState
 import com.zkerriga.types.Chance
+import com.zkerriga.types.boundaries.optional
+import com.zkerriga.types.boundaries.optional.*
 
 case class DealerShot(target: Side, shell: Shell)
 
 object DealerShot:
-  def execute(state: GameState, shot: DealerShot): V[DealerWins.type | ContinuableOutcome | GameState] =
-    Shot
-      .execute(state.public, Shot(actor = Dealer, target = shot.target, shell = shot.shell))
-      .flatMap:
-        case DealerWins => DealerWins.ok
-        case win: PlayerWins => ContinuableOutcome.WinDetails(win, state.hidden.dealer.notes.slotGroups).ok
-        case reset: Reset => ContinuableOutcome.ResetDetails(reset, state.hidden.dealer.notes.slotGroups).ok
-        case table: TableState =>
-          for {
-            dealerKnowledge <- updateDealer(old = state.public, table = table, shot, state.hidden.dealer)
-          } yield GameState(
-            public = table,
-            hidden = PrivateStates(
-              dealer = dealerKnowledge,
-              player = state.hidden.player.afterShellOut,
-            ),
-          )
+  def execute(state: GameState, shot: DealerShot): V[DealerWins | ContinuableOutcome | GameState] =
+    exec(state, shot): table =>
+      optional:
+        updateBelief(conditionBelief(old = state.public, table = table, shot, state.hidden.dealer).?)
 
-  private def updateDealer(
+  def executeSimple(state: GameState, shot: DealerShot): V[DealerWins | ContinuableOutcome | GameState] =
+    exec(state, shot): _ =>
+      updateBelief(state.hidden.dealer.belief).some
+
+  private def exec(state: GameState, shot: DealerShot) =
+    val event = Shot(actor = Dealer, target = shot.target, shell = shot.shell)
+    Execute.shot(state, event)(
+      player = state.hidden.player.afterShellOut,
+      notes = state.hidden.dealer.notes.copy(usedMeds = false),
+    )
+
+  private def conditionBelief(
     old: TableState,
     table: TableState,
     shot: DealerShot,
     knowledge: DealerKnowledge,
-  ): V[DealerKnowledge] =
-    for {
-      adjustedBelief <- knowledge.belief.conditioning(
-        condition(old = old, oldNotes = knowledge.notes, table = table, shot),
-      )
-    } yield DealerKnowledge(
-      belief = adjustedBelief.update(_.afterShellOut),
-      notes = knowledge.notes.copy(usedMeds = false),
-    )
+  ): Option[BeliefState[Revealed]] =
+    knowledge.belief.conditioning: revealed =>
+      if missOnShellOut(revealed, old = old.shotgun, updated = table.shotgun, out = shot.shell) then Chance.NoChance
+      else
+        val realAction = DealerAi.Action.Shoot(shot.target)
+        val prediction = DealerAi.next(old, knowledge.notes, revealed)
+        prediction.chanceOf(realAction)
 
-  private def condition(old: TableState, oldNotes: DealerNotes, table: TableState, shot: DealerShot)(
-    revealed: Revealed,
-  ): Chance =
-    if missOnShellOut(revealed, old = old.shotgun, updated = table.shotgun, out = shot.shell) then Chance.NoChance
-    else {
-      val realAction = DealerAi.Action.Shoot(shot.target)
-      val prediction = DealerAi.next(old, oldNotes, revealed)
-      prediction.chanceOf(realAction)
-    }
+  private def updateBelief(belief: BeliefState[Revealed]): BeliefState[Revealed] =
+    belief.update(_.afterShellOut)

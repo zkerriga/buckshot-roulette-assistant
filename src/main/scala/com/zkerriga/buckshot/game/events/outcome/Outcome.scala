@@ -5,6 +5,7 @@ import com.zkerriga.buckshot.game.state.partitipant.{Health, Items, Participant}
 
 object Outcome:
   case object DealerWins
+  type DealerWins = DealerWins.type
 
   case class PlayerWins(
     dealer: Items,
